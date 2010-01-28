@@ -59,6 +59,7 @@ def run_bowtie_builder(bowtie_path, fasta_path):
 
     if is_up_to_date_b(fasta_path, "%s/%s.1.ebwt" % (d, p)):
         return None
+    print >>sys.stderr, "running: %s" % cmd
     process = Popen(cmd, shell=True)
     return process
 
@@ -93,7 +94,7 @@ def parse_alignment(bowtie_aln_file):
                'miss': mismatch, 'read_sequence': rseq}
 
 
-def count_conversions(original_fasta, direction, read_aln, raw_reads,
+def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
                       read_len=76, use_existing=False, write_text_file=True):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
@@ -107,8 +108,8 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads,
     if direction == 'r':
         chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
-    fconverted = original_fasta + ".%s.converted.bin" 
-    ftotal =     original_fasta + ".%s.total.bin" 
+    fconverted = out_dir + "/" + original_fasta + ".%s.converted.bin" 
+    ftotal =     out_dir + "/" + original_fasta + ".%s.total.bin" 
 
     counts = {}
     for k in fa.iterkeys():
@@ -175,7 +176,7 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads,
         converted = counts[seqid]['converted']
         total     = counts[seqid]['total']
 
-        print >>sys.stderr, "writing %s" % seqid
+        # TODO: check if .bin files are up to date?
         print >>sys.stderr, "bp covered: %i" % (total[total > 0].shape[0], )
 
         converted.tofile(fconverted % seqid)
@@ -183,6 +184,10 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads,
 
         #mtype = np.fromfile("%s.%s.methyltype.bin" % (original_fasta, seqid))
         if write_text_file:
+            # TODO: write the .methyl.bin file here...
+            files = (fconverted % seqid) + ", " + (ftotal % seqid)
+            print >>sys.stderr, "writing:", files
+
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
             to_text_file(total, converted, mtype, seqid)
@@ -218,52 +223,6 @@ def convert_reads_c2t(reads_path):
     return c2t, len(line) 
 
 
-# currently not used. remove.
-def fastq_to_fasta(reads_path, use_numeric_header=True):
-    """ reads in fastq format:
-@HWI-EAS105_0001:1:1:7:1680#0/1
-TATTTATTGTTATTAGTTATTTTANTANAAATANTNGANGGGGAGGAAGGNNNNNNTNNNNNNNNGANNNNANGAG
-+HWI-EAS105_0001:1:1:7:1680#0/1
-gggccggcgdgSgg\aYcYcBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
-
-    where the 1st line is header 2nd is seq, 3rd is header, 4th is score.
-    since we know the sequence number from the reads file, here just
-    use that.
-    """
-    raw_fasta = reads_path + ".raw.fasta"
-    c2t_fasta = reads_path + ".c2t.fasta"
-    if is_up_to_date_b(reads_path, raw_fasta) and \
-            is_up_to_date_b(reads_path, c2t_fasta):
-        return raw_fasta, c2t_fasta
-
-    fh  = open(raw_fasta, 'w')
-    cfh = open(c2t_fasta, 'w')
-
-    reads_fh = open(reads_path)
-    header = reads_fh.readline().rstrip()
-    i = 0
-    while header:
-        seq = reads_fh.readline().rstrip().upper()
-        # it's a score line.
-        if header[0] == '+': 
-            header = reads_fh.readline().rstrip()
-            continue
-
-        assert header[0] == '@'
-        if use_numeric_header:
-            header = str(i)
-        i += 1
-
-        print >>fh, ">%s" % header
-        print >>fh, seq
-
-        print >>cfh, ">%s" % header
-        print >>cfh, seq.replace('C', 'T')
-        header = reads_fh.readline().rstrip()
-    fh.close()
-    cfh.close()
-    return raw_fasta, c2t_fasta
-
 if __name__ == "__main__":
     import optparse
     p = optparse.OptionParser(__doc__)
@@ -297,7 +256,7 @@ if __name__ == "__main__":
     if a is not None: a.wait()
     if b is not None: b.wait()
 
-    count_conversions(fasta, 'f', forward_aln, raw_reads, read_len,
-                      use_existing=False, write_text_file=False)
-    count_conversions(fasta, 'r', reverse_aln, raw_reads, read_len,
-                      use_existing=True, write_text_file=True)
+    count_conversions(fasta, 'f', forward_aln, raw_reads, opts.outdir,
+                      read_len, use_existing=False, write_text_file=False)
+    count_conversions(fasta, 'r', reverse_aln, raw_reads, opts.outdir,
+                      read_len, use_existing=True, write_text_file=True)
