@@ -128,8 +128,12 @@ TBD.
 
 Reading
 =======
-Eckers paper.
-http://www.nature.com/nature/journal/v462/n7271/extref/nature08514-s1.pdf
+* Eckers paper.
+  http://www.nature.com/nature/journal/v462/n7271/extref/nature08514-s1.pdf
+
+* Bowtie Paper:
+  Langmead B, Trapnell C, Pop M, Salzberg SL. Ultrafast and memory-efficient
+  alignment of short DNA sequences to the human genome. Genome Biol 10:R25.
 
 Notes
 =====
