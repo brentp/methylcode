@@ -1,0 +1,4 @@
+*.pyc
+code/*.c
+code/*.so
+code/build/
