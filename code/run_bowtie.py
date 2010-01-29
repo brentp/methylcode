@@ -14,7 +14,15 @@ from cbowtie import _update_conversions
 
 revcomp = lambda a: complement(a)[::-1]
 
-def write_c2t(fasta_name, outdir):
+CPU_COUNT = 4
+try:
+    import multiprocessing
+    CPU_COUNT = multiprocessing.cpu_count()
+except:
+    import processing
+    CPU_COUNT = processing.cpuCount()
+
+def write_c2t(fasta_name, out_dir):
     """
     given a fasta file and write 2 new files. given some.fasta:
         `some.forward.c2t.fasta` contains the same headers but all C's 
@@ -22,14 +30,14 @@ def write_c2t(fasta_name, outdir):
         `some.reverse.c2t.fasta` contains the reverse-complemented sequece
                                  with all C's converted to T.
     """
-    if outdir is None:
-        outdir = op.dirname(fasta_name) or "./"
-    if not op.exists(outdir):
-        os.mkdir(outdir)
+    if out_dir is None:
+        out_dir = op.dirname(fasta_name) or "./"
+    if not op.exists(out_dir):
+        os.mkdir(out_dir)
 
     p, ext = op.splitext(op.basename(fasta_name)) # some.fasta -> some, fasta
-    revname = op.join(outdir, "%s.reverse.c2t%s" % (p, ext))
-    forname = op.join(outdir, "%s.forward.c2t%s" % (p, ext))
+    revname = op.join(out_dir, "%s.reverse.c2t%s" % (p, ext))
+    forname = op.join(out_dir, "%s.forward.c2t%s" % (p, ext))
     if op.exists(revname) and op.exists(forname): return forname, revname
     fasta = Fasta(fasta_name, flatten_inplace=True)
 
@@ -64,7 +72,7 @@ def run_bowtie_builder(bowtie_path, fasta_path):
     return process
 
 
-def run_bowtie(bowtie_path, ref_path, reads_c2t, mismatches, threads=3, **kwargs):
+def run_bowtie(bowtie_path, ref_path, reads_c2t, mismatches, threads=CPU_COUNT, **kwargs):
     out_file = ref_path + ".mapping"
     cmd = ("%(bowtie_path)s/bowtie -v %(mismatches)d --norc -k1 --best " + \
           "--mm -p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
@@ -76,10 +84,11 @@ def run_bowtie(bowtie_path, ref_path, reads_c2t, mismatches, threads=3, **kwargs
     if is_up_to_date_b(ref_path + ".1.ebwt", out_file) and \
        is_up_to_date_b(reads_c2t, out_file):
         print >>sys.stderr, "^ up to date, not running ^"
-        return None, out_file
+        return out_file
 
     process = Popen(cmd, shell=True)
-    return process, out_file
+    process.wait()
+    return out_file
 
 
 # manual.html#default-bowtie-output
@@ -91,14 +100,31 @@ def parse_alignment(bowtie_aln_file):
         assert strand == '+', (strand, line)
         yield {'header': read, 'seqid': ref_seqid, 'strand': strand, 
                'pos': int(pos), 'nhits': int(nhits),
-               'miss': mismatch, 'read_sequence': rseq}
+               'nmiss': mismatch.count(':'), # mismatch is eg.: '52:A>N,68:T>N'
+               'miss': mismatch, } #'read_sequence': rseq}
 
+def bin_paths_from_fasta(original_fasta, out_dir=''):
+    """
+    given the fasta, return the paths to the binary
+    files that will be created
+    """
+    opath = op.splitext(op.basename(original_fasta))[0]
+    paths = [ out_dir + "/" + opath + ".%s.converted.bin",
+              out_dir + "/" + opath + ".%s.total.bin",
+              out_dir + "/" + opath + ".%s.methyl.bin",
+              out_dir + "/" + opath + ".%s.methyltype.bin" ]
+    if out_dir == '':
+        return [p.lstrip("/") for p in paths]
+    return paths
 
 def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
+                      allowed_mismatches,
                       read_len=76, use_existing=False, write_text_file=True):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     assert direction in 'fr'
+    print >>sys.stderr, "tabulating %s methylation for %s" % \
+            (direction, original_fasta)
 
     fa = Fasta(original_fasta, flatten_inplace=True)
     fh_raw_reads = open(raw_reads, 'r')
@@ -107,9 +133,10 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
 
     if direction == 'r':
         chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
-
-    fconverted = out_dir + "/" + original_fasta + ".%s.converted.bin" 
-    ftotal =     out_dir + "/" + original_fasta + ".%s.total.bin" 
+ 
+    # get the 4 possible binary files for each chr
+    fconverted, ftotal, fmethyl, fmethyltype = \
+            bin_paths_from_fasta(original_fasta, out_dir)
 
     counts = {}
     for k in fa.iterkeys():
@@ -130,7 +157,6 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
     assert len(fa[k]) == len(counts[k]['total'])
     assert len(fa[k]) == len(counts[k]['converted'])
 
-    print >>sys.stderr, "tabulating methylation for seqid: %s" % k
     skipped = 0
     pairs = "CT" if direction == "f" else "GA" # 
     for p in parse_alignment(read_aln):
@@ -168,28 +194,47 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
             assert c2t == p['read_sequence']
         # so we have to keep the ref in forward here to get the correct bp
         # positions. so we look for CT when forward and GA when back.
-        skipped += _update_conversions(genomic_ref, raw, pos, pairs, counts[seqid]['total'], 
-                                                        counts[seqid]['converted'])
-    print >>sys.stderr, "skipped %i alignments where read T mapped to genomic C" % skipped
+        current_mismatches = p['nmiss']
+        # we send in the current mismatches and allowed mismatches so that in
+        # the case where a C in the ref seq has becomes a T in the align seq
+        # (but wasnt calc'ed as a mismatch because we had converted C=>T. if
+        # these errors cause the number of mismatches to exceed the number of
+        # allowed mismatches, we dont include the stats for this read.
+        remaining_mismatches = allowed_mismatches - current_mismatches
+        skipped += _update_conversions(genomic_ref, raw, pos, pairs, 
+                                       counts[seqid]['total'], 
+                                       counts[seqid]['converted'],
+                                      remaining_mismatches)
+    print >>sys.stderr, \
+            "skipped %i alignments where read T mapped to genomic C" % skipped
 
     for seqid in sorted(counts.keys()):
         converted = counts[seqid]['converted']
         total     = counts[seqid]['total']
 
         # TODO: check if .bin files are up to date?
-        print >>sys.stderr, "bp covered: %i" % (total[total > 0].shape[0], )
+        print >>sys.stderr, "bp covered: %i for chr %s" % \
+                            (total[total > 0].shape[0], seqid)
 
         converted.tofile(fconverted % seqid)
         total.tofile(ftotal % seqid)
 
-        #mtype = np.fromfile("%s.%s.methyltype.bin" % (original_fasta, seqid))
         if write_text_file:
             # TODO: write the .methyl.bin file here...
-            files = (fconverted % seqid) + ", " + (ftotal % seqid)
-            print >>sys.stderr, "writing:", files
+            files = "\n\t".join([f % seqid for f in
+                              bin_paths_from_fasta(original_fasta, out_dir)])
+            print >>sys.stderr, "writing:\n", files
+            assert np.all(converted <= total)
+
+            meth = (1.0 - (converted/total.astype(np.float32))).astype(np.float32)
+            meth[np.isnan(meth) | np.isinf(meth)] = 0
+            meth.tofile(fmethyl % seqid)
+            del meth
+
 
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
+            mtype.tofile(fmethyltype % seqid)
             to_text_file(total, converted, mtype, seqid)
 
 
@@ -228,8 +273,11 @@ if __name__ == "__main__":
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
+    p.add_option("--threads", dest="threads", type='int', 
+        help="number of threads to use when running bowtie. if not specified,"
+             " the number of cpu's on the current machine is used.")
     p.add_option("--reads", dest="reads", help="path to reads file containing only sequence")
-    p.add_option("--outdir", dest="outdir", help="path to a directory in "
+    p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
 
     p.add_option("--mismatches", dest="mismatches", default=2, type="int",
@@ -241,7 +289,12 @@ if __name__ == "__main__":
         sys.exit(p.print_help())
     fasta = args[0]
 
-    fforward_c2t, freverse_c2t = write_c2t(fasta, opts.outdir)
+    if opts.threads:
+        CPU_COUNT = opts.threads
+
+
+
+    fforward_c2t, freverse_c2t = write_c2t(fasta, opts.out_dir)
     pforward = run_bowtie_builder(opts.bowtie, fforward_c2t)
     preverse = run_bowtie_builder(opts.bowtie, freverse_c2t)
     if preverse is not None: preverse.wait()
@@ -251,12 +304,12 @@ if __name__ == "__main__":
     c2t_reads, read_len = convert_reads_c2t(raw_reads)  
     ref_forward = op.splitext(fforward_c2t)[0]
     ref_reverse = op.splitext(freverse_c2t)[0]
-    a, forward_aln = run_bowtie(opts.bowtie, ref_forward, c2t_reads, opts.mismatches)
-    b, reverse_aln = run_bowtie(opts.bowtie, ref_reverse, c2t_reads, opts.mismatches)
-    if a is not None: a.wait()
-    if b is not None: b.wait()
+    forward_aln = run_bowtie(opts.bowtie, ref_forward, c2t_reads, opts.mismatches)
+    reverse_aln = run_bowtie(opts.bowtie, ref_reverse, c2t_reads, opts.mismatches)
 
-    count_conversions(fasta, 'f', forward_aln, raw_reads, opts.outdir,
+    count_conversions(fasta, 'f', forward_aln, raw_reads, opts.out_dir,
+                      opts.mismatches,
                       read_len, use_existing=False, write_text_file=False)
-    count_conversions(fasta, 'r', reverse_aln, raw_reads, opts.outdir,
+    count_conversions(fasta, 'r', reverse_aln, raw_reads, opts.out_dir,
+                      opts.mismatches,
                       read_len, use_existing=True, write_text_file=True)

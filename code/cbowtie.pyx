@@ -7,7 +7,8 @@ import sys
 def _update_conversions(char *ref_seq, char *aln_seq, int base_position, 
                         char *pair,
                         np.ndarray[np.uint8_t] total_count, 
-                        np.ndarray[np.uint8_t] converted_count):
+                        np.ndarray[np.uint8_t] converted_count,
+                       int allowed_mismatches):
     """
     this updates the conversions (counts) from c2t in between
     the ref_sequence and the aln_seq
@@ -24,7 +25,8 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
         # TODO: check this for GA
         if ref_seq[i] != c2: continue
         if aln_seq[i] == c1: 
-            return 1
+            if allowed_mismatches == 0: return 1
+            allowed_mismatches -= 1
     """
 
     for i in range(n):
