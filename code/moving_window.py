@@ -1,47 +1,50 @@
 import numpy as np
-import os
-from run_bowtie import is_up_to_date_b
-from calculate_methylation_points import calc_methylation
-from pyfasta import Fasta
+import sys
 
-window = 50
+def moving_window(binfile, window):
+    methyl = np.fromfile(binfile, dtype=np.float32)
+    mt = np.fromfile(binfile.replace(".methyl.bin",
+                                     ".methyltype.bin"),dtype=np.uint8)
+    outfile = binfile.replace(".methyl.bin", ".%s.w%i.bin")
+    for mname, mtype in (("CG", 1), ("CHG", 2), ("CHH", 3)):
+        # make a copy because it gets changed.
+        meth = np.copy(methyl) 
+        # change the values of the types we're not intrested in to 0
+        # the types are 1 - 6 (see README.rst)
+        meth[(mt != mtype) & (mt != mtype + 3)] = 0
 
-fasta = Fasta("thaliana_v8.fasta")
-methyl = "thaliana_v8.fasta.%i.methyl.bin"
-mtype  = "thaliana_v8.fasta.%i.methyltype.bin"
-converted = "thaliana_v8.fasta.%i.converted.bin"
-total = "thaliana_v8.fasta.%i.total.bin"
-
-for ichr in range(1, 6):
-    i = ichr
-    if not is_up_to_date_b(converted % ichr, methyl % ichr):
-        tot = np.fromfile(total % i, dtype=np.uint8)
-        con = np.fromfile(converted % i, dtype=np.uint8)
-        meth = (1.0 - (con/tot.astype(np.float32))).astype(np.float32)
-        meth[np.where(np.isnan(meth))] = 0
-        meth.tofile(methyl % ichr)
-    else:
-        print methyl % ichr, "up to date"
-        meth = np.fromfile(methyl % ichr, dtype=np.float32)
-    
-    if not is_up_to_date_b(total % i, mtype % i):
-        seq = str(fasta[str(ichr)])
-        assert seq , (fasta.keys(), fasta[str(ichr)][:10])
-        print len(seq)
-        print mtype % ichr, "calculating methylation type"
-        mt = calc_methylation(str(seq))
-        print mt.shape
-        mt.tofile(total.replace('.total.bin', '.methyltype.bin') % ichr)
-    else:     
-        print mtype % ichr, "up to date"
-        mt = np.fromfile(mtype  % ichr, dtype=np.uint8)
-
-    assert mt.shape == meth.shape
-    print mt.shape, meth.shape        
-    # only want cg methy
-    meth[(mt != 1) & (mt != 4)] = 0
-    avg = np.convolve(meth, np.ones((window,)) / float(window),
+        assert mt.shape == meth.shape
+        of = outfile % (mname, window)
+        print "writing: %s" % of
+        # only want cg methy
+        avg = np.convolve(meth, np.ones((window,)) / float(window),
                       mode='same').astype(np.float32)
-    assert avg.shape == mt.shape
-    avg.tofile("at.cg.%i.%i.bin" % (window, ichr))
-    del meth, mt
+        assert avg.shape == mt.shape
+        avg.tofile(of)
+
+if __name__ == "__main__":
+    usage = """ calculate a moving window average given .methyl.bin files
+
+    usage: %prog -w [window size=50] files
+
+for each input file, 3 output files are created, one for each methylation
+type. output files are 32 bit floats each with the same number of entries
+as the methyl.bin file (which matches the number of basepairs in the chr).
+    """
+    import optparse
+    p = optparse.OptionParser(usage)
+    p.add_option('-w', dest='window', type='int', default=50)
+    opts, args = p.parse_args()
+    if len(args) == 0:
+        print "must specify .methyl.bin files for the moving window"
+        sys.exit(p.print_help())
+
+    """
+    if len(args) == 1:
+        if "*" in args[0]:
+            import glob
+            args = glob.glob(args[0])
+    """
+    for binfile in args:
+        moving_window(binfile, opts.window)
+
