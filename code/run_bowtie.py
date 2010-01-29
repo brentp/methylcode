@@ -147,15 +147,14 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
         if use_existing:
-            counts[k] = {'total': np.fromfile(ftotal % k, dtype=np.uint8),
+            counts[k] = {'total': np.fromfile(ftotal % k, dtype=np.uint16),
                          'converted': np.fromfile(fconverted % k,
-                                                  dtype=np.uint8)}
+                                                  dtype=np.uint16)}
         else:
-            counts[k] = {'total': np.zeros((len(fa[k]),), dtype=np.uint8),
+            counts[k] = {'total': np.zeros((len(fa[k]),), dtype=np.uint16),
                          # total reads in which this c changed to t 
-                         'converted': np.zeros((len(fa[k]),), dtype=np.uint8)}
-    assert len(fa[k]) == len(counts[k]['total'])
-    assert len(fa[k]) == len(counts[k]['converted'])
+                         'converted': np.zeros((len(fa[k]),), dtype=np.uint16)}
+    assert len(fa[k]) == len(counts[k]['total']) == len(counts[k]['converted'])
 
     skipped = 0
     pairs = "CT" if direction == "f" else "GA" # 
@@ -209,21 +208,21 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
             "skipped %i alignments where read T mapped to genomic C" % skipped
 
     for seqid in sorted(counts.keys()):
-        converted = counts[seqid]['converted']
         total     = counts[seqid]['total']
+        converted = counts[seqid]['converted']
 
         # TODO: check if .bin files are up to date?
         print >>sys.stderr, "bp covered: %i for chr %s" % \
                             (total[total > 0].shape[0], seqid)
 
-        converted.tofile(fconverted % seqid)
         total.tofile(ftotal % seqid)
+        converted.tofile(fconverted % seqid)
 
         if write_text_file:
             # TODO: write the .methyl.bin file here...
             files = "\n\t".join([f % seqid for f in
                               bin_paths_from_fasta(original_fasta, out_dir)])
-            print >>sys.stderr, "writing:\n", files
+            print >>sys.stderr, "writing:\n\t", files
             assert np.all(converted <= total)
 
             meth = (1.0 - (converted/total.astype(np.float32))).astype(np.float32)
@@ -243,9 +242,6 @@ def to_text_file(total, converted, methylation_type, seqid, out=sys.stdout):
     convert the numpy arrays to a file of format:
     seqid [TAB] bp(0-based) [TAB] total-reads covering this bp [TAB] reads where c => t
     """
-    if isinstance(total, str):
-        total = np.fromfile(total, dtype=np.uint8)
-        converted = np.fromfile(converted, dtype=np.uint8)
     idxs, = np.where(total)
     for bp, mt, tt, cc in np.column_stack((idxs, methylation_type[idxs],
                                            total[idxs], converted[idxs])):
