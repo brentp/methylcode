@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 def check_txt(txt, fa):
-    f = Fasta(fa)
+    f = Fasta(fa, flatten_inplace=True)
     for line in open(txt):
         seqid, mtype, bp, tot, conv = line.rstrip().split()
         bp = int(bp)
@@ -14,14 +14,15 @@ def check_txt(txt, fa):
             assert f[seqid][bp] == 'C'
         else:
             assert f[seqid][bp] == 'G'
-    print "OK"
+    print txt, "OK"
     return 0
 
 def check_bin(binpath, fa_path):
     # a.5.methyltype.bin => 5
     seqid = binpath.split(".")[-3]
     is_m = ".methyl." in binpath
-    dtype = np.float32 if is_m else np.uint8
+    is_mtype = ".methyltype." in binpath
+    dtype = np.float32 if is_m else np.uint8 if is_mtype else np.uint16
 
     fa = Fasta(fa_path) 
     bin = np.fromfile(binpath, dtype=dtype)
@@ -38,6 +39,7 @@ def check_bin(binpath, fa_path):
     else:
         # TODO: add checks.
         pass
+    print binpath, "OK"
 
 if __name__ == "__main__":
     import optparse
@@ -67,7 +69,7 @@ if __name__ == "__main__":
             print "must specify a txt file to check"
             sys.exit(p.print_help())
 
-        check_txt(opts.fasta, args[0])
+        check_txt(args[0], opts.fasta)
 
     elif opts.bin:
         for binfile in args:

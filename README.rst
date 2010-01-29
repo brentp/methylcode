@@ -68,9 +68,9 @@ Output
    + methyltype.bin with values between 1 and 6 as described below (value of
      0 means no methylation is possible at this basepair). [encoded as uint8]
    + converted.bin containing the number of C's converted to T's (same as
-     column 5 above). [encoded as uint8]
+     column 5 above). [encoded as uint16]
    + total.bin containing the total times a given position is covered by a
-     read (same as column 4 above). [encoded as uint8]
+     read (same as column 4 above). [encoded as uint16]
    + methyl.bin containing the proportion of reads which were methylated at
      this basepair == 1 - (converted / total). [encoded as float32]
 
@@ -115,12 +115,29 @@ commandline arguments.
 
 Given that output, one can then do a sanity check on the output by running::
 
-    $ python sanity_check_txt.py reads.methylation.txt
+    $ python sanity_check.py -b -f thaliana_v8.fasta r/thaliana_v8.1.methyl.bin
+
+to check the binary file in the directory '/r' was specified when calling
+run_bowtie.py above. For a text file, the command is::
+
+    $ python sanity_check.py -t -f thaliana_v8.fasta reads.methylation.txt
 
 Because that is reading a text file, it will take a couple minutes, but it 
 should *never* fail. Once it's certain that the output is sane, one can create
 a moving-window average of the methylation data using the moving_window.py
-script. TODO: this script is hard-coded.
+script. For each input .methyl.bin file, it will create 3 output files, 1 for
+each methylation type. So, for the 5 arabidopsis chromosomes, to generate the
+15 total moving windows for a window-size of 100, run as::
+
+   $ python python moving_window.py -w 100 r/thaliana_v8.*.methyl.bin
+
+the output files for chromosome 5 will look like:
+   * r/thaliana_v8.5.CG.w100.bin
+   * r/thaliana_v8.5.CHG.w100.bin
+   * r/thaliana_v8.5.CHH.w100.bin
+
+these are written as 32 bit floats.
+
 
 Analysis/Visualization
 ======================
