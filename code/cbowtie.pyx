@@ -20,14 +20,12 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
     # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]
 
-    """
     for i in range(n):
         # TODO: check this for GA
         if ref_seq[i] != c2: continue
         if aln_seq[i] == c1: 
             if allowed_mismatches == 0: return 1
             allowed_mismatches -= 1
-    """
 
     for i in range(n):
         a = ref_seq[i]
