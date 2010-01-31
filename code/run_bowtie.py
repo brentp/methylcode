@@ -3,7 +3,7 @@ write the forward and reverse mappings for use by bowtie.
 much of the code in this file benefited from a read of the 
 code contained in bsseeker.
 """
-from pyfasta import Fasta, complement
+from pyfasta import Fasta
 import numpy as np
 import sys
 import os.path as op
@@ -11,8 +11,11 @@ import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
 from cbowtie import _update_conversions
+import string
 
-revcomp = lambda a: complement(a)[::-1]
+
+def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
+    return s.translate(_comp)[::-1]
 
 CPU_COUNT = 4
 try:
@@ -103,12 +106,15 @@ def parse_alignment(bowtie_aln_file):
                'nmiss': mismatch.count(':'), # mismatch is eg.: '52:A>N,68:T>N'
                'miss': mismatch, } #'read_sequence': rseq}
 
-def bin_paths_from_fasta(original_fasta, out_dir=''):
+def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     """
     given the fasta, return the paths to the binary
     files that will be created
     """
     opath = op.splitext(op.basename(original_fasta))[0]
+    if pattern_only:
+        return ((out_dir + "/") if out_dir else "") + opath + ".%s.*.bin"
+
     paths = [ out_dir + "/" + opath + ".%s.converted.bin",
               out_dir + "/" + opath + ".%s.total.bin",
               out_dir + "/" + opath + ".%s.methyl.bin",
@@ -168,13 +174,13 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
         raw = fh_raw_reads.read(read_len)
 
         if direction == 'r':
-            # TODO: reason out that this pos is right
+            # reason out that this pos is right
             pos = chr_lengths[seqid] - pos - read_len
-            # cant revcomp because it will mess up the pos.
-            genomic_ref = str(fa[seqid][pos:pos + read_len])
+            # since the read matched the flipped genome. we flip it here.
             raw = revcomp(raw)
-        else:
-            genomic_ref = str(fa[seqid][pos:pos + read_len])
+
+
+        genomic_ref = str(fa[seqid][pos:pos + read_len])
 
         # so the position is the line num * the read_id + read_id (where the +
         # is to account for the newlines.
@@ -211,18 +217,16 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
         total     = counts[seqid]['total']
         converted = counts[seqid]['converted']
 
-        # TODO: check if .bin files are up to date?
-        print >>sys.stderr, "bp covered: %i for chr %s" % \
-                            (total[total > 0].shape[0], seqid)
-
         total.tofile(ftotal % seqid)
         converted.tofile(fconverted % seqid)
 
         if write_text_file:
             # TODO: write the .methyl.bin file here...
-            files = "\n\t".join([f % seqid for f in
-                              bin_paths_from_fasta(original_fasta, out_dir)])
-            print >>sys.stderr, "writing:\n\t", files
+            file_pat = bin_paths_from_fasta(original_fasta, out_dir, 
+                                            pattern_only=True)
+
+            print >>sys.stderr, "#> writing:", file_pat % seqid
+            np.seterr(divide="ignore")
             assert np.all(converted <= total)
 
             meth = (1.0 - (converted/total.astype(np.float32))).astype(np.float32)
@@ -256,7 +260,7 @@ def convert_reads_c2t(reads_path):
     if is_up_to_date_b(reads_path, c2t): 
 
         return c2t, len(open(reads_path).readline().strip())
-    print >>sys.stderr, "coverting C to T in %s" % (reads_path)
+    print >>sys.stderr, "converting C to T in %s" % (reads_path)
     out = open(c2t, 'wb')
     for line in open(reads_path):
         out.write(line.replace('C', 'T'))
@@ -269,25 +273,25 @@ if __name__ == "__main__":
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
-    p.add_option("--threads", dest="threads", type='int', 
-        help="number of threads to use when running bowtie. if not specified,"
-             " the number of cpu's on the current machine is used.")
     p.add_option("--reads", dest="reads", help="path to reads file containing only sequence")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
 
     p.add_option("--mismatches", dest="mismatches", default=2, type="int",
              help="number of mismatches allowed. sent to bowtie executable")
+    p.add_option("--fasta", dest="fasta",
+             help="path to fasta file to which to align reads")
 
     opts, args = p.parse_args()
 
-    if not (opts.reads and opts.bowtie and args[0] and len(args) == 1):
+    if not (opts.reads and opts.bowtie):
         sys.exit(p.print_help())
-    fasta = args[0]
 
-    if opts.threads:
-        CPU_COUNT = opts.threads
-
+    fasta = opts.fasta
+    if fasta is None:
+        assert len(args) == 1, "must specify path to fasta file"
+        fasta = args[0]
+        assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
 
 
     fforward_c2t, freverse_c2t = write_c2t(fasta, opts.out_dir)
