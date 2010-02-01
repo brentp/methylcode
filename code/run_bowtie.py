@@ -25,7 +25,7 @@ except:
     import processing
     CPU_COUNT = processing.cpuCount()
 
-def write_c2t(fasta_name, out_dir):
+def write_c2t(fasta_name):
     """
     given a fasta file and write 2 new files. given some.fasta:
         `some.forward.c2t.fasta` contains the same headers but all C's 
@@ -33,29 +33,37 @@ def write_c2t(fasta_name, out_dir):
         `some.reverse.c2t.fasta` contains the reverse-complemented sequece
                                  with all C's converted to T.
     """
-    if out_dir is None:
-        out_dir = op.dirname(fasta_name) or "./"
-    if not op.exists(out_dir):
-        os.mkdir(out_dir)
+    d = op.join(op.dirname(fasta_name), "bowtie_index")
+    if not op.exists(d): os.mkdir(d)
 
     p, ext = op.splitext(op.basename(fasta_name)) # some.fasta -> some, fasta
-    revname = op.join(out_dir, "%s.reverse.c2t%s" % (p, ext))
-    forname = op.join(out_dir, "%s.forward.c2t%s" % (p, ext))
+    revname = "%s/%s.reverse.c2t%s" % (d, p, ext)
+    forname = "%s/%s.forward.c2t%s" % (d, p, ext)
     if op.exists(revname) and op.exists(forname): return forname, revname
     fasta = Fasta(fasta_name, flatten_inplace=True)
 
     reverse_fh = open(revname, 'w')
     forward_fh = open(forname, 'w')
+    print >>sys.stderr, "writing: %s, %s" % (revname, forname)
 
-    for header in fasta.iterkeys():
-        seq = str(fasta[header]).upper()
-        print >>reverse_fh, ">%s" % header
-        print >>forward_fh, ">%s" % header
+    try:
+        for header in fasta.iterkeys():
+            seq = str(fasta[header]).upper()
+            assert not ">" in seq
+            print >>reverse_fh, ">%s" % header
+            print >>forward_fh, ">%s" % header
 
-        print >>reverse_fh, revcomp(seq).replace('C', 'T')
-        print >>forward_fh, seq.replace('C', 'T')
+            print >>reverse_fh, revcomp(seq).replace('C', 'T')
+            print >>forward_fh, seq.replace('C', 'T')
 
-    reverse_fh.close(); forward_fh.close()
+        reverse_fh.close(); forward_fh.close()
+    except:
+        try: reverse_fh.close(); forward_fh.close()
+        except: pass
+        os.unlink(revname)
+        os.unlink(forname)
+        raise
+
     return forname, revname
 
 def is_up_to_date_b(a, b):
@@ -75,8 +83,8 @@ def run_bowtie_builder(bowtie_path, fasta_path):
     return process
 
 
-def run_bowtie(bowtie_path, ref_path, reads_c2t, mismatches, threads=CPU_COUNT, **kwargs):
-    out_file = ref_path + ".mapping"
+def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CPU_COUNT, **kwargs):
+    out_file = out_dir + "/" + op.basename(ref_path) + ".mapping"
     cmd = ("%(bowtie_path)s/bowtie -v %(mismatches)d --norc -k1 --best " + \
           "--mm -p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
           "%(out_file)s") % locals() 
@@ -294,7 +302,7 @@ if __name__ == "__main__":
         assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
 
 
-    fforward_c2t, freverse_c2t = write_c2t(fasta, opts.out_dir)
+    fforward_c2t, freverse_c2t = write_c2t(fasta)
     pforward = run_bowtie_builder(opts.bowtie, fforward_c2t)
     preverse = run_bowtie_builder(opts.bowtie, freverse_c2t)
     if preverse is not None: preverse.wait()
@@ -304,8 +312,10 @@ if __name__ == "__main__":
     c2t_reads, read_len = convert_reads_c2t(raw_reads)  
     ref_forward = op.splitext(fforward_c2t)[0]
     ref_reverse = op.splitext(freverse_c2t)[0]
-    forward_aln = run_bowtie(opts.bowtie, ref_forward, c2t_reads, opts.mismatches)
-    reverse_aln = run_bowtie(opts.bowtie, ref_reverse, c2t_reads, opts.mismatches)
+    forward_aln = run_bowtie(opts.bowtie, ref_forward, opts.out_dir,
+                             c2t_reads, opts.mismatches)
+    reverse_aln = run_bowtie(opts.bowtie, ref_reverse, opts.out_dir,
+                             c2t_reads, opts.mismatches)
 
     count_conversions(fasta, 'f', forward_aln, raw_reads, opts.out_dir,
                       opts.mismatches,
