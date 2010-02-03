@@ -96,7 +96,7 @@ but may be made to do so in the future) with a unix command like::
 This will create a file containing only the sequence. cd into the directory
 containing the run_bowtie.py script (from the directory containing this file
 cd into the code/ directory) and run the script with the path to the fasta,
-the path to the bowtie executable (which you have already compiled), the reads
+the path to the *directory containing the* bowtie executable (which you have already compiled), the reads
 file and the directory where the output will be sent.::
 
     $ cd code/
