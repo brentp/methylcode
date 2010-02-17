@@ -161,13 +161,13 @@ def count_conversions(original_fasta, direction, read_aln, raw_reads, out_dir,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
         if use_existing:
-            counts[k] = {'total': np.fromfile(ftotal % k, dtype=np.uint16),
+            counts[k] = {'total': np.fromfile(ftotal % k, dtype=np.uint32),
                          'converted': np.fromfile(fconverted % k,
-                                                  dtype=np.uint16)}
+                                                  dtype=np.uint32)}
         else:
-            counts[k] = {'total': np.zeros((len(fa[k]),), dtype=np.uint16),
+            counts[k] = {'total': np.zeros((len(fa[k]),), dtype=np.uint32),
                          # total reads in which this c changed to t 
-                         'converted': np.zeros((len(fa[k]),), dtype=np.uint16)}
+                         'converted': np.zeros((len(fa[k]),), dtype=np.uint32)}
     assert len(fa[k]) == len(counts[k]['total']) == len(counts[k]['converted'])
 
     skipped = 0
@@ -316,10 +316,19 @@ if __name__ == "__main__":
                              c2t_reads, opts.mismatches)
     reverse_aln = run_bowtie(opts.bowtie, ref_reverse, opts.out_dir,
                              c2t_reads, opts.mismatches)
-
-    count_conversions(fasta, 'f', forward_aln, raw_reads, opts.out_dir,
-                      opts.mismatches,
-                      read_len, use_existing=False, write_text_file=False)
-    count_conversions(fasta, 'r', reverse_aln, raw_reads, opts.out_dir,
+    try:
+        count_conversions(fasta, 'f', forward_aln, raw_reads, opts.out_dir,
+                          opts.mismatches,
+                          read_len, use_existing=False, write_text_file=False)
+        count_conversions(fasta, 'r', reverse_aln, raw_reads, opts.out_dir,
                       opts.mismatches,
                       read_len, use_existing=True, write_text_file=True)
+    except Exception, e:
+        files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=False)
+        for f in files:
+            try: os.unlink(f)
+            except OSError: pass
+        print >>sys.stderr, "ERROR: don't use .bin or text files"
+        print >>sys.stderr, str(e)
+        raise e
+

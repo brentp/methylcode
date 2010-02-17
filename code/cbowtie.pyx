@@ -6,8 +6,8 @@ import sys
 
 def _update_conversions(char *ref_seq, char *aln_seq, int base_position, 
                         char *pair,
-                        np.ndarray[np.uint16_t] total_count,
-                        np.ndarray[np.uint16_t] converted_count,
+                        np.ndarray[np.uint32_t] total_count,
+                        np.ndarray[np.uint32_t] converted_count,
                        int allowed_mismatches):
     """
     this updates the conversions (counts) from c2t in between
