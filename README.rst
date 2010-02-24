@@ -68,9 +68,9 @@ Output
    + methyltype.bin with values between 1 and 6 as described below (value of
      0 means no methylation is possible at this basepair). [encoded as uint8]
    + converted.bin containing the number of C's converted to T's (same as
-     column 5 above). [encoded as uint16]
+     column 5 above). [encoded as uint32]
    + total.bin containing the total times a given position is covered by a
-     read (same as column 4 above). [encoded as uint16]
+     read (same as column 4 above). [encoded as uint32]
    + methyl.bin containing the proportion of reads which were methylated at
      this basepair == 1 - (converted / total). [encoded as float32]
 
