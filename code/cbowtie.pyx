@@ -25,7 +25,10 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
         if ref_seq[i] != c2: continue
         if aln_seq[i] == c1: 
             if allowed_mismatches == 0: return 1
+            #ref_seq[i] = 'N'
+            aln_seq[i] = 'N'
             allowed_mismatches -= 1
+    if allowed_mismatches < 0: return 1
 
     for i in range(n):
         a = ref_seq[i]

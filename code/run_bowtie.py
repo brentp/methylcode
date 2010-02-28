@@ -332,3 +332,4 @@ if __name__ == "__main__":
         print >>sys.stderr, str(e)
         raise e
 
+    print >>sys.stderr, "SUCCESS"
