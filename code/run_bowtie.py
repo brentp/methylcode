@@ -331,5 +331,11 @@ if __name__ == "__main__":
         print >>sys.stderr, "ERROR: don't use .bin or text files"
         print >>sys.stderr, str(e)
         raise e
+    finally:
+        import datetime
+        cmd = open(opts.out_dir +"/cmd.ran", "w")
+        print >>cmd, "#date", str(datetime.date.today())
+        print >>cmd,"#path:", op.abspath(".")
+        print >>cmd, " ".join(sys.argv)
 
     print >>sys.stderr, "SUCCESS"
