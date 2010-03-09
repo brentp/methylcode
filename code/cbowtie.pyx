@@ -19,16 +19,16 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
     cdef char a, b
     # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]
-
     for i in range(n):
-        # TODO: check this for GA
+        # if genome is a T and read is a C
+        # bowtie couldnt find this cause we
+        # converted C to T.
         if ref_seq[i] != c2: continue
         if aln_seq[i] == c1: 
             if allowed_mismatches == 0: return 1
-            #ref_seq[i] = 'N'
-            aln_seq[i] = 'N'
             allowed_mismatches -= 1
     if allowed_mismatches < 0: return 1
+    # TODO what to do if C aligns to N?
 
     for i in range(n):
         a = ref_seq[i]
