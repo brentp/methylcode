@@ -8,14 +8,14 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
                         char *pair,
                         np.ndarray[np.uint32_t] total_count,
                         np.ndarray[np.uint32_t] converted_count,
-                       int allowed_mismatches):
+                       int allowed_mismatches, int n):
     """
     this updates the conversions (counts) from c2t in between
     the ref_sequence and the aln_seq
     first it checks if the sequence was mistakenly aligned by the c2t 
     conversion. if so, it does not update the counts.
     """
-    cdef int i, n = stdlib.strlen(ref_seq)
+    cdef int i #, n = stdlib.strlen(ref_seq)
     cdef char a, b
     # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]

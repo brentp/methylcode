@@ -116,28 +116,47 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
 ['0', '4', '*', '0', '0', '*', '*', '0', '0', 'NATTATTTTTTTAATTGTAAATTTTTNATTGAAATTTTGTAAATA', 'IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII', 'XM:i:0\n']
 """
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file):
-    #print >>sys.stderr, "parsing %s" % sam_aln_file
+def parse_sam(sam_aln_file, direction, chr_lengths):
+    if direction == 'f':
+        out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "w")
+    else:
+        out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "a")
+
     for sline in open(sam_aln_file):
         if sline[0] == "@": continue
         line = sline.split("\t")
         # no reported alignments.
         if line[1] == '4': continue 
         assert line[1] == '0', line
-        #print >>sys.stderr, line
+
+        pos0 = int(line[3]) - 1
         seq = line[9]
+        seqid = line[2]
+        read_len = len(seq)
+
+        if direction == 'f':
+            print >>out, sline,
+        else:
+            pos0 = chr_lengths[seqid] - pos0 - read_len
+            line[3] = str(pos0 + 1)
+            # since the read matched the flipped genome. we flip it here.
+            line[9] = seq = revcomp(seq)
+            line[1] = '16' # alignment on reverse strand.
+
+            print >>out, "\t".join(line),
+
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
         nmiss = int(NM[-1])
         yield dict(
             read_id=int(line[0]),
             seqid=line[2],
-            pos0=int(line[3]) - 1,
+            pos0=pos0,
             mapq=line[4],
             nmiss=nmiss,
             read_sequence=seq
         )
-
+    out.close()
 
 def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     """
@@ -171,6 +190,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
 
     if direction == 'r':
         chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
+    else:
+        chr_lengths = None
  
     # get the 4 possible binary files for each chr
     fconverted, ftotal, fmethyl, fmethyltype = \
@@ -197,39 +218,33 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     skipped = 0
     align_count = 0
     pairs = "CT" if direction == "f" else "GA" # 
-    for p in parse_sam(sam_file):
-        # this is also the line number from the original file.
+    for p in parse_sam(sam_file, direction, chr_lengths):
+        # read_id is also the line number from the original file.
         read_id = p['read_id']
         pos0 = p['pos0']
-        seqid = p['seqid']
         align_count += 1
 
+        # the position is the line num * the read_id + read_id (where the +
+        # is to account for the newlines.
         fh_raw_reads.seek((read_id * read_len) + read_id)
         raw = fh_raw_reads.read(read_len)
 
         if direction == 'r':
-            # reason out that this pos is right
-            pos0 = chr_lengths[seqid] - pos0 - read_len
-            # since the read matched the flipped genome. we flip it here.
             raw = revcomp(raw)
 
-
-        print >>sys.stderr, "f['%s'][%i:%i + %i]" % (seqid, pos0, pos0, read_len)
-        genomic_ref = str(fa[seqid][pos0:pos0 + read_len])
-
-        # so the position is the line num * the read_id + read_id (where the +
-        # is to account for the newlines.
-        DEBUG = True
+        genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len])
+        DEBUG = False
         if DEBUG:
-            #print >>sys.stderr, p
+            print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0, 
+                                                         pos0, read_len)
             fh_c2t_reads.seek((read_id * read_len) + read_id)
             print >>sys.stderr, p['nmiss']
             print >>sys.stderr, "ref        :", genomic_ref
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
                 c2t = fh_c2t_reads.read(read_len)
-                assert c2t == p['read_sequence']
                 c2t = revcomp(c2t)
+                assert c2t == p['read_sequence']
 
             else:
                 print >>sys.stderr, "raw_read(f):", raw
@@ -237,8 +252,9 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                 assert c2t == p['read_sequence']
             print >>sys.stderr, "c2t        :",  c2t, "\n"
             raw_input("press any key...\n")
-        # so we have to keep the ref in forward here to get the correct bp
-        # positions. so we look for CT when forward and GA when back.
+
+        # have to keep the ref in forward here to get the correct bp
+        # positions. look for CT when forward and GA when back.
         current_mismatches = p['nmiss']
         # we send in the current mismatches and allowed mismatches so that in
         # the case where a C in the ref seq has becomes a T in the align seq
@@ -247,8 +263,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         # allowed mismatches, we dont include the stats for this read.
         remaining_mismatches = allowed_mismatches - current_mismatches
         skipped += _update_conversions(genomic_ref, raw, pos0, pairs, 
-                                       counts[seqid]['total'], 
-                                       counts[seqid]['converted'],
+                                       counts[p['seqid']]['total'], 
+                                       counts[p['seqid']]['converted'],
                                       remaining_mismatches, read_len)
     print >>sys.stderr, \
             "skipped %i alignments where read T mapped to genomic C" % skipped
@@ -370,8 +386,9 @@ if __name__ == "__main__":
                       opts.mismatches,
                       read_len, use_existing=True, write_text_file=True)
     except:
-        files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=False)
-        for f in files:
+        files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
+        for f in glob.glob(files):
+            print >>sys.stderr, "deleting:", f
             try: os.unlink(f)
             except OSError: pass
         print >>sys.stderr, "ERROR: don't use .bin or text files"
