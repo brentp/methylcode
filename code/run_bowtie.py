@@ -270,6 +270,10 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             "skipped %i alignments where read T mapped to genomic C" % skipped
     print >>sys.stderr, "total alignments: %i" % align_count
 
+    if write_text_file:
+        out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
+                    % datetime.date.today(), 'w')
+
     for seqid in sorted(counts.keys()):
         total     = counts[seqid]['total']
         converted = counts[seqid]['converted']
@@ -294,8 +298,6 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
             mtype.tofile(fmethyltype % seqid)
-            out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
-                    % datetime.date.today(), 'w')
             to_text_file(total, converted, mtype, seqid, out)
 
 
