@@ -17,6 +17,7 @@ from cbowtie import _update_conversions
 import string
 import glob
 import datetime
+np.seterr(divide="ignore")
 
 
 def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
@@ -112,9 +113,6 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
 
 # <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> \
 #        <ISIZE> <SEQ> <QUAL> \ [<TAG>:<VTYPE>:<VALUE> [...]]
-"""
-['0', '4', '*', '0', '0', '*', '*', '0', '0', 'NATTATTTTTTTAATTGTAAATTTTTNATTGAAATTTTGTAAATA', 'IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII', 'XM:i:0\n']
-"""
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
 def parse_sam(sam_aln_file, direction, chr_lengths):
     if direction == 'f':
@@ -167,8 +165,8 @@ def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     if pattern_only:
         return ((out_dir + "/") if out_dir else "") + opath + ".%s.*.bin"
 
-    paths = [ out_dir + "/" + opath + ".%s.converted.bin",
-              out_dir + "/" + opath + ".%s.total.bin",
+    paths = [ out_dir + "/" + opath + ".%s.c.bin",
+              out_dir + "/" + opath + ".%s.t.bin",
               out_dir + "/" + opath + ".%s.methyl.bin",
               out_dir + "/" + opath + ".%s.methyltype.bin" ]
     if out_dir == '':
@@ -177,7 +175,7 @@ def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
 
 def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                       allowed_mismatches,
-                      read_len=76, use_existing=False, write_text_file=True):
+                      read_len=76):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     assert direction in 'fr'
@@ -194,26 +192,23 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         chr_lengths = None
  
     # get the 4 possible binary files for each chr
-    fconverted, ftotal, fmethyl, fmethyltype = \
+    fc, ft, fmethyl, fmethyltype = \
             bin_paths_from_fasta(original_fasta, out_dir)
 
     counts = {}
     for k in fa.iterkeys():
         # so this will be a dict of position => conv
-        # the keys in 'n', 't' are the integer positions.
-        #            total reads covering a particular c
-        # here we add to total and converted np.fromfile() from the forward,
+        # here we add to fc and ft np.fromfile() from the forward,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
-        if use_existing:
-            counts[k] = {'total': np.fromfile(ftotal % k, dtype=np.uint32),
-                         'converted': np.fromfile(fconverted % k,
-                                                  dtype=np.uint32)}
+        if direction == 'r':
+            counts[k] = {'t': np.fromfile(fc % k, dtype=np.uint32),
+                         'c': np.fromfile(ft % k, dtype=np.uint32)}
         else:
-            counts[k] = {'total': np.zeros((len(fa[k]),), dtype=np.uint32),
+            counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
                          # total reads in which this c changed to t 
-                         'converted': np.zeros((len(fa[k]),), dtype=np.uint32)}
-    assert len(fa[k]) == len(counts[k]['total']) == len(counts[k]['converted'])
+                         'c': np.zeros((len(fa[k]),), dtype=np.uint32)}
+        assert len(fa[k]) == len(counts[k]['t']) == len(counts[k]['c'])
 
     skipped = 0
     align_count = 0
@@ -263,33 +258,32 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         # allowed mismatches, we dont include the stats for this read.
         remaining_mismatches = allowed_mismatches - current_mismatches
         skipped += _update_conversions(genomic_ref, raw, pos0, pairs, 
-                                       counts[p['seqid']]['total'], 
-                                       counts[p['seqid']]['converted'],
+                                       counts[p['seqid']]['c'], 
+                                       counts[p['seqid']]['t'],
                                       remaining_mismatches, read_len)
-    print >>sys.stderr, \
-            "skipped %i alignments where read T mapped to genomic C" % skipped
     print >>sys.stderr, "total alignments: %i" % align_count
+    print >>sys.stderr, \
+            "skipped %i alignments (%i%%) where read T mapped to genomic C" % \
+                  (skipped, 100.0 * skipped / align_count)
 
-    if write_text_file:
+    if direction == 'r':
         out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
                     % datetime.date.today(), 'w')
 
     for seqid in sorted(counts.keys()):
-        total     = counts[seqid]['total']
-        converted = counts[seqid]['converted']
+        cs = counts[seqid]['c']
+        ts = counts[seqid]['t']
 
-        total.tofile(ftotal % seqid)
-        converted.tofile(fconverted % seqid)
+        cs.tofile(fc % seqid)
+        ts.tofile(ft % seqid)
 
-        if write_text_file:
+        if direction == 'r':
             file_pat = bin_paths_from_fasta(original_fasta, out_dir, 
                                             pattern_only=True)
 
             print >>sys.stderr, "#> writing:", file_pat % seqid
-            np.seterr(divide="ignore")
-            assert np.all(converted <= total)
 
-            meth = (1.0 - (converted/total.astype(np.float32))).astype(np.float32)
+            meth = (cs / (cs + ts).astype('f')).astype(np.float32)
             meth[np.isnan(meth) | np.isinf(meth)] = 0
             meth.tofile(fmethyl % seqid)
             del meth
@@ -298,19 +292,20 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
             mtype.tofile(fmethyltype % seqid)
-            to_text_file(total, converted, mtype, seqid, out)
+            to_text_file(cs, ts, mtype, seqid, out)
 
 
-def to_text_file(total, converted, methylation_type, seqid, out=sys.stdout):
+def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     """
     convert the numpy arrays to a file of format:
-    seqid [TAB] bp(0-based) [TAB] total-reads covering this bp [TAB] reads where c => t
+    seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
     print >>out, make_header()
-    idxs, = np.where(total)
-    for bp, mt, tt, cc in np.column_stack((idxs, methylation_type[idxs],
-                                           total[idxs], converted[idxs])):
-        print >>out, "\t".join(map(str, (seqid, mt, bp, tt, cc)))
+    print >>out, "\t".join(("seqid\tmt\tbp\tc\tt"))
+    idxs, = np.where(cs + ts)
+    for bp, mt, c, t in np.column_stack((idxs, methylation_type[idxs],
+                                           cs[idxs], ts[idxs])):
+        print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
 
 def convert_reads_c2t(reads_path):
@@ -329,12 +324,12 @@ def convert_reads_c2t(reads_path):
     return c2t, len(line) 
 
 def make_header():
-    return """
+    return """\
 #created by: %s
 #on: %s
 #from: %s
-#version: %s
-""" % (" ".join(sys.argv), datetime.date.today(), op.abspath("."), __version__)
+#version: %s""" % (" ".join(sys.argv), datetime.date.today(), 
+                   op.abspath("."), __version__)
 
 
 if __name__ == "__main__":
@@ -383,10 +378,10 @@ if __name__ == "__main__":
     try:
         count_conversions(fasta, 'f', forward_sam, raw_reads, opts.out_dir,
                           opts.mismatches,
-                          read_len, use_existing=False, write_text_file=False)
+                          read_len)
         count_conversions(fasta, 'r', reverse_sam, raw_reads, opts.out_dir,
                       opts.mismatches,
-                      read_len, use_existing=True, write_text_file=True)
+                      read_len)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):

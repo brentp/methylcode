@@ -6,8 +6,8 @@ import sys
 
 def _update_conversions(char *ref_seq, char *aln_seq, int base_position, 
                         char *pair,
-                        np.ndarray[np.uint32_t] total_count,
-                        np.ndarray[np.uint32_t] converted_count,
+                        np.ndarray[np.uint32_t] c_count,
+                        np.ndarray[np.uint32_t] t_count,
                        int allowed_mismatches, int n):
     """
     this updates the conversions (counts) from c2t in between
@@ -28,13 +28,13 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
             if allowed_mismatches == 0: return 1
             allowed_mismatches -= 1
     if allowed_mismatches < 0: return 1
-    # TODO what to do if C aligns to N?
 
     for i in range(n):
         a = ref_seq[i]
         if a != c1: continue
         b = aln_seq[i]
-        total_count[base_position + i] += 1
-        if b == c2:
-            converted_count[base_position + i] += 1
+        # CC
+        if b == c1: c_count[base_position + i] = 1
+        # CT
+        if b == c2: t_count[base_position + i] = 1
     return 0
