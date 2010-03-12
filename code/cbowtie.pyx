@@ -45,7 +45,7 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
             c_count[base_position + i] += 1
             # d[i] = chr(c1)
         # CT
-        if b == c2:
+        elif b == c2:
             t_count[base_position + i] += 1
             # d[i] = chr(c2)
     # sys.stderr.write("mat:" + "".join(d) + "\n")

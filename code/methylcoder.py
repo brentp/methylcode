@@ -302,7 +302,7 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
     print >>out, make_header()
-    print >>out, "\t".join(("seqid\tmt\tbp\tc\tt"))
+    print >>out, "#seqid\tmt\tbp\tc\tt"
     idxs, = np.where(cs + ts)
     for bp, mt, c, t in np.column_stack((idxs, methylation_type[idxs],
                                            cs[idxs], ts[idxs])):
