@@ -265,7 +265,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                                       remaining_mismatches, read_len)
     print >>sys.stderr, "total alignments: %i" % align_count
     print >>sys.stderr, \
-            "skipped %i alignments (%i%%) where read T mapped to genomic C" % \
+            "skipped %i alignments (%.3f%%) where read T mapped to genomic C" % \
                   (skipped, 100.0 * skipped / align_count)
 
     if direction == 'r':
