@@ -27,6 +27,7 @@ C
 -
 
 * `bowtie`_ for aligning the reads to the genome.
+* (optional) `sam-tools`_ for view the alignments and processing the reads
 
 Installation
 ------------
@@ -54,10 +55,11 @@ Output
    1) seqid (chromosome)
    2) methylation type (1 to 6)
    3) basepair position (0-indexed) 
-   4) reads covering this position
-   5) reads where C is converted to T at this position (or G to A)  
+   4) reads with C at this position
+   5) reads with T at this position
 
   methylation can be calculated as 1 - (column 5 / column 4)
+  4 and 5 are corrected for strand (can read G, A respectively for - strand).
 
 * a set of binary files for each chromosome in the fasta file. each file
    contains a value for each basepair in the chromosome--many of which will be
@@ -67,13 +69,12 @@ Output
 
    + methyltype.bin with values between 1 and 6 as described below (value of
      0 means no methylation is possible at this basepair). [encoded as uint8]
-   + converted.bin containing the number of C's converted to T's (same as
+   + cs.bin containing the number of reads with C's at each position (same as
+     column 4 above). [encoded as uint32]
+   + ts.bin containing the number of reads with T's at each position (same as
      column 5 above). [encoded as uint32]
-   + total.bin containing the total times a given position is covered by a
-     read (same as column 4 above). [encoded as uint32]
    + methyl.bin containing the proportion of reads which were methylated at
-     this basepair == 1 - (converted / total). [encoded as float32]
-
+     this basepair == (c / (c + t)). [encoded as float32]
 
 
 * Methylation type is a value between 1 and 6:
@@ -94,22 +95,23 @@ but may be made to do so in the future) with a unix command like::
     $ sed -n '2,${p;n;n;n;}' reads.fastq > reads.raw 
 
 This will create a file containing only the sequence. cd into the directory
-containing the run_bowtie.py script (from the directory containing this file
+containing the methylcoder.py script (from the directory containing this file
 cd into the code/ directory) and run the script with the path to the fasta,
 the path to the *directory containing the* bowtie executable (which you have already compiled), the reads
 file and the directory where the output will be sent.::
 
     $ cd code/
-    $ python run_bowtie.py --bowtie=/path/to/bowtie \
-                           --reads /path/to/reads.raw \
-                           --outdir r/ thaliana_v8.fasta > reads.methylation.txt
+    $ python methylcoder.py --bowtie=/path/to/bowtie \
+                            --reads /path/to/reads.raw \
+                            --outdir r/   \
+                            thaliana_v8.fasta 
 
 This will create the files specified in `Output`_ above, sending the text to 
-`reads.methylation.txt` and the binary files to, for example:
-thaliana_v8.fasta.[CHR].methyl.bin where [CHR] is substituted for each 
-chromosome in (in this case) arabidopsis thaliana. Once bowtie is run once,
-it's output is not deleted, and run_bowtie.py will only re-run bowtie if its
-input has been modified since it was run last. *NOTE* if the `run_bowtie.py`
+`r/methy-data-DATE.txt` where DATE is the current date. The binary files will
+be sent to, for example: thaliana_v8.fasta.[CHR].methyl.bin where [CHR] is 
+substituted by each chromosome in the fasta file. Once bowtie is run once,
+it's output is not deleted, and methylcoder.py will only re-run bowtie if its
+input has been modified since it was run last. *NOTE* if the `methylcoder.py`
 script is called without any options, it will print help and its available
 commandline arguments.
 
@@ -118,9 +120,9 @@ Given that output, one can then do a sanity check on the output by running::
     $ python sanity_check.py -b -f thaliana_v8.fasta r/thaliana_v8.1.methyl.bin
 
 to check the binary file in the directory '/r' was specified when calling
-run_bowtie.py above. For a text file, the command is::
+methylcoder.py above. For a text file, the command is::
 
-    $ python sanity_check.py -t -f thaliana_v8.fasta reads.methylation.txt
+    $ python sanity_check.py -t -f thaliana_v8.fasta r/methyl-data-DATE.txt
 
 Because that is reading a text file, it will take a couple minutes, but it 
 should *never* fail. Once it's certain that the output is sane, one can create
@@ -141,7 +143,8 @@ these are written as 32 bit floats.
 
 Analysis/Visualization
 ======================
-TBD.
+
+See: http://github.com/brentp/methylcode/wikis/using-samtools-to-view-alignments
 
 Reading
 =======
@@ -156,11 +159,11 @@ Notes
 =====
 
 **warning** 
-run_bowtie.py assumes that the Bisulfite converted reads are created
+methylcoder.py assumes that the Bisulfite converted reads are created
 using the Zilberman/Ecker method in which BS conversion occurs *after* 
 conversion to solexa library--giving only 2 possibibilities. This is in 
 contrast to the Jacobsen method which gives 4 possiblities. (The code in 
-run_bowtie.py could easily be made to handle the 2 additional possiblities but
+methylcoder.py could be made to handle the 2 additional possiblities but
 does not do so currently)
 
 .. _`cython`: http://cython.org
@@ -168,3 +171,4 @@ does not do so currently)
 .. _`pyfasta`: http://pypi.python.org/pypi/pyfasta/
 .. _`h5py`: http://pypi.python.org/pypi/h5py/
 .. _`bowtie`: http://bowtie-bio.sourceforge.net/index.shtml
+.. _`sam-tools`: http://samtools.sourceforge.net/
