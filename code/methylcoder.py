@@ -1,10 +1,10 @@
 """
 write the forward and reverse mappings for use by bowtie.
-much of the code in this file benefited from a read of the 
-code contained in bsseeker.
+the code in this file originally benefited from a read of the
+methodology in bsseeker.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from pyfasta import Fasta
 import numpy as np
@@ -27,7 +27,7 @@ CPU_COUNT = 4
 try:
     import multiprocessing
     CPU_COUNT = multiprocessing.cpu_count()
-except:
+except ImportError:
     import processing
     CPU_COUNT = processing.cpuCount()
 
@@ -81,8 +81,6 @@ def run_bowtie_builder(bowtie_path, fasta_path):
     p, ext = op.splitext(op.basename(fasta_path)) # some.fasta -> some, fasta
     cmd = '%s/bowtie-build -f %s %s/%s > %s/%s.log' % \
                 (bowtie_path, fasta_path, d, p, d, p)
-    cmd = '%s/bowtie-build -f %s %s/%s > %s/%s.log' % \
-                (bowtie_path, fasta_path, d, p, d, p)
 
     if is_up_to_date_b(fasta_path, "%s/%s.1.ebwt" % (d, p)):
         return None
@@ -114,7 +112,7 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
 # <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> \
 #        <ISIZE> <SEQ> <QUAL> \ [<TAG>:<VTYPE>:<VALUE> [...]]
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file, direction, chr_lengths):
+def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
     if direction == 'f':
         out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "w")
     else:
@@ -127,32 +125,40 @@ def parse_sam(sam_aln_file, direction, chr_lengths):
         if line[1] == '4': continue 
         assert line[1] == '0', line
 
-        pos0 = int(line[3]) - 1
-        seq = line[9]
+        read_id = int(line[0])
         seqid = line[2]
-        read_len = len(seq)
+        pos0 = int(line[3]) - 1
+        converted_seq = line[9]
+
+        # we want to include the orginal, non converted reads
+        # in the output file to view the alignment.
+        # read_id is the line in the file.
+        fh_raw_reads.seek((read_id * read_len) + read_id)
+        raw_seq = fh_raw_reads.read(read_len)
 
         if direction == 'f':
+            line[9] = raw_seq
             print >>out, sline,
         else:
             pos0 = chr_lengths[seqid] - pos0 - read_len
             line[3] = str(pos0 + 1)
             # since the read matched the flipped genome. we flip it here.
-            line[9] = seq = revcomp(seq)
+            line[9] = raw_seq = revcomp(raw_seq)
             line[1] = '16' # alignment on reverse strand.
-
+            converted_seq = revcomp(converted_seq)
             print >>out, "\t".join(line),
 
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
         nmiss = int(NM[-1])
         yield dict(
-            read_id=int(line[0]),
+            read_id=read_id,
             seqid=line[2],
             pos0=pos0,
             mapq=line[4],
             nmiss=nmiss,
-            read_sequence=seq
+            read_sequence=converted_seq,
+            raw_read=raw_seq,
         )
     out.close()
 
@@ -213,20 +219,16 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     skipped = 0
     align_count = 0
     pairs = "CT" if direction == "f" else "GA" # 
-    for p in parse_sam(sam_file, direction, chr_lengths):
+    for p in parse_sam(sam_file, direction, chr_lengths, fh_raw_reads,
+                       read_len):
         # read_id is also the line number from the original file.
         read_id = p['read_id']
         pos0 = p['pos0']
         align_count += 1
+        raw = p['raw_read']
 
         # the position is the line num * the read_id + read_id (where the +
         # is to account for the newlines.
-        fh_raw_reads.seek((read_id * read_len) + read_id)
-        raw = fh_raw_reads.read(read_len)
-
-        if direction == 'r':
-            raw = revcomp(raw)
-
         genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len])
         DEBUG = False
         if DEBUG:
@@ -287,7 +289,6 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             meth[np.isnan(meth) | np.isinf(meth)] = 0
             meth.tofile(fmethyl % seqid)
             del meth
-
 
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
