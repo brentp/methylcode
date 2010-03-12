@@ -6,7 +6,7 @@ import numpy as np
 def check_txt(txt, fa):
     f = Fasta(fa, flatten_inplace=True)
     for line in open(txt):
-        seqid, mtype, bp, tot, conv = line.rstrip().split()
+        seqid, mtype, bp, cs, ts = line.rstrip().split()
         bp = int(bp)
         mtype = int(mtype)
         assert mtype > 0
@@ -22,7 +22,7 @@ def check_bin(binpath, fa_path):
     seqid = binpath.split(".")[-3]
     is_m = ".methyl." in binpath
     is_mtype = ".methyltype." in binpath
-    dtype = np.float32 if is_m else np.uint8 if is_mtype else np.uint16
+    dtype = np.float32 if is_m else np.uint8 if is_mtype else np.uint32
 
     fa = Fasta(fa_path) 
     bin = np.fromfile(binpath, dtype=dtype)
