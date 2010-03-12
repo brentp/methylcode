@@ -90,10 +90,10 @@ class Methyl(object):
         self.seqid = seqid
 
         self.ts = np.fromfile(self.mg.dir + self.mg.pattern % \
-                        (self.seqid, 'converted'), dtype=np.uint32)
+                        (self.seqid, 't'), dtype=np.uint32)
 
         self.cs = np.fromfile(self.mg.dir + self.mg.pattern % \
-                    (self.seqid, 'total'), dtype=np.uint32) - self.ts
+                        (self.seqid, 'c'), dtype=np.uint32)
 
         self.mt = self.methyltype = np.fromfile(self.mg.dir + self.mg.pattern % \
                 (self.seqid, 'methyltype'), dtype=np.uint8)
