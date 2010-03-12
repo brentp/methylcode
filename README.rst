@@ -18,16 +18,16 @@ all of these are available from pypi and as such are installable via
   $  easy_install [module]
 
 
-* `numpy`_ for handling arrays and binary data in python
-* `pyfasta`_ for easy access and slicing of fasta files
-* `cython`_ for fast c-extensions for python
-* (optional) `h5py`_ for organizing the output
+* `numpy`_ to handle arrays and binary data in python
+* `pyfasta`_ to access/index fasta files
+* `cython`_ fast c-extensions for python
+* (optional) `h5py`_ organizing the output
 
 C
 -
 
-* `bowtie`_ for aligning the reads to the genome.
-* (optional) `sam-tools`_ for view the alignments and processing the reads
+* `bowtie`_ to align the reads to the genome.
+* (optional) `sam-tools`_ to view the alignments and processing the reads
 
 Installation
 ------------
@@ -78,12 +78,12 @@ Output
 
 
 * Methylation type is a value between 1 and 6:
-   + 1 == CG  on + strand
-   + 2 == CHG on + strand
-   + 3 == CHH on + strand
-   + 4 == CG  on - strand
-   + 5 == CHG on - strand
-   + 6 == CHH on - strand
+   1) CG  on + strand
+   2) CHG on + strand
+   3) CHH on + strand
+   4) CG  on - strand
+   5) CHG on - strand
+   6) CHH on - strand
 
 Pipeline
 ========
