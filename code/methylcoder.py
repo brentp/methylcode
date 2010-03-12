@@ -208,8 +208,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
         if direction == 'r':
-            counts[k] = {'t': np.fromfile(fc % k, dtype=np.uint32),
-                         'c': np.fromfile(ft % k, dtype=np.uint32)}
+            counts[k] = {'t': np.fromfile(ft % k, dtype=np.uint32),
+                         'c': np.fromfile(fc % k, dtype=np.uint32)}
         else:
             counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
                          # total reads in which this c changed to t 
