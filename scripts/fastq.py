@@ -1,14 +1,16 @@
 import sys
 
 class FastQ(object):
-    def __init__(self, fname, unique=True, max_n=8):
+    def __init__(self, fname, unique=True, unique_sequence=True, max_n=8):
         self.fname = fname
         self.uniq = unique
+        self.uniq_seq = unique_sequence
         self.max_n = max_n
 
     def __iter__(self):
         self.fh = open(self.fname)
         self.seen = {}
+        self.seen_seq = {}
         return self
 
     def next(self):
@@ -23,8 +25,15 @@ class FastQ(object):
             l3 = self.fh.readline()[0] # redundant, just use single char.
             qual = self.fh.readline().rstrip()
             if self.uniq:
-                if name in self.seen: continue
+                if name in self.seen: 
+                    if self.uniq_seq: self.seen_seq[seq] = True
+                    continue
                 self.seen[name] = None
+            if self.uniq_seq:
+                if seq in self.seen_seq:
+                    continue
+                self.seen_seq[seq] = None
+
             if self.max_n:
                 if seq.count("N") > self.max_n: continue
 
@@ -51,12 +60,14 @@ if __name__ == "__main__":
     p = optparse.OptionParser("%prog [options] fastq")
     p.add_option("-n", dest="max_n", type='int', default=8, 
                  help="filter lines with more N's than this")
-    p.add_option("-u", dest="unique", action="store_true", default=False, 
+    p.add_option("-u", dest="unique_sequence", action="store_true", default=False, 
                  help="only print unique sequences")
+    p.add_option("-d", dest="unique_header", action="store_true", default=False, 
+                 help="only print unique headers")
     opts, args = p.parse_args()
     if not len(args):
         print "send in fastq file!"
         sys.exit(p.print_help())
 
-    for q in FastQ(args[0], opts.unique, opts.max_n):
+    for q in FastQ(args[0], opts.unique_header, opts.unique_sequence, opts.max_n):
         print q
