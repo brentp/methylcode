@@ -181,7 +181,7 @@ def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
 
 def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                       allowed_mismatches,
-                      read_len=76):
+                      read_len):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     assert direction in 'fr'
@@ -192,10 +192,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     fh_raw_reads = open(raw_reads, 'r')
     fh_c2t_reads = open(raw_reads + ".c2t", 'r')
 
-    if direction == 'r':
-        chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
-    else:
-        chr_lengths = None
+    chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
  
     # get the 4 possible binary files for each chr
     fc, ft, fmethyl, fmethyltype = \
@@ -248,7 +245,6 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                 c2t = fh_c2t_reads.read(read_len)
                 assert c2t == p['read_sequence']
             print >>sys.stderr, "c2t        :",  c2t, "\n"
-            raw_input("press any key...\n")
 
         # have to keep the ref in forward here to get the correct bp
         # positions. look for CT when forward and GA when back.
@@ -263,6 +259,9 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
                                        counts[p['seqid']]['c'], 
                                        counts[p['seqid']]['t'],
                                       remaining_mismatches, read_len)
+        if DEBUG:
+            raw_input("press any key...\n")
+
     print >>sys.stderr, "total alignments: %i" % align_count
     print >>sys.stderr, \
             "skipped %i alignments (%.3f%%) where read T mapped to genomic C" % \
@@ -277,6 +276,12 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
         ts = counts[seqid]['t']
+        csum = float(cs.sum())
+        tsum = float(ts.sum())
+        mask = (cs + ts) > 0
+        meth = (cs[mask].astype('f') / (cs[mask] + ts[mask]))
+        print >>sys.stderr, "chr: %s, cs: %i, ts: %i, methylation: %.4f" \
+                % (seqid, csum, tsum, meth.mean())
 
         cs.tofile(fc % seqid)
         ts.tofile(ft % seqid)
@@ -287,16 +292,10 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
 
             print >>sys.stderr, "#> writing:", file_pat % seqid
 
-            meth = (cs / (cs + ts).astype('f')).astype(np.float32)
-            meth[np.isnan(meth) | np.isinf(meth)] = 0
-            meth.tofile(fmethyl % seqid)
-            del meth
-
             seq = str(fa[seqid])
             mtype = calc_methylation(seq)
             mtype.tofile(fmethyltype % seqid)
             to_text_file(cs, ts, mtype, seqid, out)
-    write_sam_commands(opts.out_dir, fa)
 
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
@@ -310,7 +309,7 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
 def write_sam_commands(out_dir, fasta):
-    fh_lens = open("%s/chr.lengths.txt", "w")
+    fh_lens = open("%s/chr.lengths.txt" % out_dir, "w")
     for k in fasta.keys():
         print >>fh_lens, "%s\t%i" % (k, len(fasta[k]))
     fh_lens.close()
@@ -318,12 +317,12 @@ def write_sam_commands(out_dir, fasta):
     print >> out, """\
 SAMTOOLS=~/src/samtools/samtools
 
-$SAMTOOLS view -b -t chr.lengths.txt %(odir)s/methylcoded.sam \
+$SAMTOOLS view -b -t %(odir)s/chr.lengths.txt %(odir)s/methylcoded.sam \
         -o %(odir)s/methylcoded.unsorted.bam
 $SAMTOOLS sort %(odir)s/methylcoded.unsorted.bam %(odir)s/methylcoded # suffix added
 $SAMTOOLS index %(odir)s/methylcoded.bam %(odir)s/methylcoded # suffix added
 # TO view:
-# $SAMTOOLS tview %(odir)/methylcoded.bam %(fapath)s
+# $SAMTOOLS tview %(odir)s/methylcoded.bam %(fapath)s
     """ % dict(odir=out_dir, fapath=fasta.fasta_name)
     out.close()
 
@@ -414,5 +413,6 @@ if __name__ == "__main__":
         print >>cmd, "#date:", str(datetime.date.today())
         print >>cmd, "#path:", op.abspath(".")
         print >>cmd, " ".join(sys.argv)
+        write_sam_commands(opts.out_dir, Fasta(fasta))
 
     print >>sys.stderr, "SUCCESS"
