@@ -271,6 +271,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     if direction == 'r':
         out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
                     % datetime.date.today(), 'w')
+        print >>out, make_header()
+        print >>out, "#seqid\tmt\tbp\tc\tt"
 
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
@@ -294,6 +296,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             mtype = calc_methylation(seq)
             mtype.tofile(fmethyltype % seqid)
             to_text_file(cs, ts, mtype, seqid, out)
+    write_sam_commands(opts.out_dir, fa)
 
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
@@ -301,13 +304,28 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     convert the numpy arrays to a file of format:
     seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
-    print >>out, make_header()
-    print >>out, "#seqid\tmt\tbp\tc\tt"
     idxs, = np.where(cs + ts)
     for bp, mt, c, t in np.column_stack((idxs, methylation_type[idxs],
                                            cs[idxs], ts[idxs])):
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
+def write_sam_commands(out_dir, fasta):
+    fh_lens = open("%s/chr.lengths.txt", "w")
+    for k in fasta.keys():
+        print >>fh_lens, "%s\t%i" % (k, len(fasta[k]))
+    fh_lens.close()
+    out = open("%s/commands.sam.sh" % out_dir, "w")
+    print >> out, """\
+SAMTOOLS=~/src/samtools/samtools
+
+$SAMTOOLS view -b -t chr.lengths.txt %(odir)s/methylcoded.sam \
+        -o %(odir)s/methylcoded.unsorted.bam
+$SAMTOOLS sort %(odir)s/methylcoded.unsorted.bam %(odir)s/methylcoded # suffix added
+$SAMTOOLS index %(odir)s/methylcoded.bam %(odir)s/methylcoded # suffix added
+# TO view:
+# $SAMTOOLS tview %(odir)/methylcoded.bam %(fapath)s
+    """ % dict(odir=out_dir, fapath=fasta.fasta_name)
+    out.close()
 
 def convert_reads_c2t(reads_path):
     """
