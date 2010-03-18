@@ -93,7 +93,7 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
     cmd = ("%(bowtie_path)s/bowtie --sam --sam-nohead " + \
            " -v %(mismatches)d --norc -k1 --best " + \
-          "--mm -p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
+          "-p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
           "%(sam_out_file)s") % locals() 
     # TODO: can add a sort here by the first column so that later access to the
     # raw reads file will have better caching behavior. but pretty fast for now
@@ -232,7 +232,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0, 
                                                          pos0, read_len)
             fh_c2t_reads.seek((read_id * read_len) + read_id)
-            print >>sys.stderr, p['nmiss']
+            print >>sys.stderr, "mismatches:", p['nmiss']
             print >>sys.stderr, "ref        :", genomic_ref
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
@@ -320,7 +320,7 @@ SAMTOOLS=~/src/samtools/samtools
 $SAMTOOLS view -b -t %(odir)s/chr.lengths.txt %(odir)s/methylcoded.sam \
         -o %(odir)s/methylcoded.unsorted.bam
 $SAMTOOLS sort %(odir)s/methylcoded.unsorted.bam %(odir)s/methylcoded # suffix added
-$SAMTOOLS index %(odir)s/methylcoded.bam %(odir)s/methylcoded # suffix added
+$SAMTOOLS index %(odir)s/methylcoded.bam
 # TO view:
 # $SAMTOOLS tview %(odir)s/methylcoded.bam %(fapath)s
     """ % dict(odir=out_dir, fapath=fasta.fasta_name)
@@ -332,14 +332,13 @@ def convert_reads_c2t(reads_path):
     """
     c2t = reads_path + ".c2t"
     if is_up_to_date_b(reads_path, c2t): 
-
         return c2t, len(open(reads_path).readline().strip())
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
     out = open(c2t, 'wb')
     for line in open(reads_path):
         out.write(line.replace('C', 'T'))
     out.close()
-    return c2t, len(line) 
+    return c2t, len(line.rstrip())
 
 def make_header():
     return """\
