@@ -332,7 +332,10 @@ def convert_reads_c2t(reads_path):
     """
     c2t = reads_path + ".c2t"
     if is_up_to_date_b(reads_path, c2t): 
-        return c2t, len(open(reads_path).readline().strip())
+        rp = open(reads_path)
+        l = len(rp.readline().rstrip())
+        rp.close()
+        return c2t, l
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
     out = open(c2t, 'wb')
     for line in open(reads_path):
