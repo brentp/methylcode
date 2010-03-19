@@ -49,10 +49,10 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
         # CT
         elif b == c2:
             t_count[base_position + i] += 1
-            #d[i] = chr(c2); tts += 1
     """
+            d[i] = chr(c2); tts += 1
     sys.stderr.write("mat:" + "".join(d) + "\n")
-    sys.stderr.write("remained     c: %i\n\n" % ccs)
-    sys.stderr.write("converted to t: %i\n" % tts)
+    sys.stderr.write("remained     c: %i\n" % ccs)
+    sys.stderr.write("converted to t: %i\n\n" % tts)
     """
     return 0

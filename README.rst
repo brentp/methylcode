@@ -45,21 +45,21 @@ The input to the pipeline is:
 
 * a genomic fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped. 
-* a reads file. all reads must be the same length and must be from 
-  Eckers/Zilberman process
+* a fastq reads file. all reads must be the same length and must be from 
+  Eckers/Zilberman bisulfite process
 
 Output
 ======
 
 * a textfile containing columns:
    1) seqid (chromosome)
-   2) methylation type (1 to 6)
+   2) methylation type (1 to 6 see below)
    3) basepair position (0-indexed) 
    4) reads with C at this position
    5) reads with T at this position
 
-  methylation can be calculated as 1 - (column 5 / column 4)
-  4 and 5 are corrected for strand (can read G, A respectively for - strand).
+  methylation can be calculated as column 4 / (column 5 + column 4)
+  4 and 5 are corrected for strand (G, A respectively for - strand).
 
 * a set of binary files for each chromosome in the fasta file. each file
    contains a value for each basepair in the chromosome--many of which will be
@@ -73,9 +73,6 @@ Output
      column 4 above). [encoded as uint32]
    + ts.bin containing the number of reads with T's at each position (same as
      column 5 above). [encoded as uint32]
-   + methyl.bin containing the proportion of reads which were methylated at
-     this basepair == (c / (c + t)). [encoded as float32]
-
 
 * Methylation type is a value between 1 and 6:
    1) CG  on + strand
@@ -87,28 +84,25 @@ Output
 
 Pipeline
 ========
-given an input fasta file of `arabidopsis_v8.fasta` and a reads file in fastq
-format of `reads.fastq`. First, process the reads file into just the sequence 
-(currently this pipeline does not regard the quality info in the fastq file
-but may be made to do so in the future) with a unix command like::
+You must have:
+    
+    1) input reference fasta file to which to align the reads. here: `thaliana_v9.fasta`
+    2) a reads file in fastq format. here: `reads.fastq`. 
+    3) bowtie built in a directory. here: `/usr/local/src/bowtie/`
+    4) an `out/` directory to send the results.
 
-    $ sed -n '2,${p;n;n;n;}' reads.fastq > reads.raw 
+An example command to run the pipeline is::
 
-This will create a file containing only the sequence. cd into the directory
-containing the methylcoder.py script (from the directory containing this file
-cd into the code/ directory) and run the script with the path to the fasta,
-the path to the *directory containing the* bowtie executable (which you have already compiled), the reads
-file and the directory where the output will be sent.::
+    $ python /usr/local/src/methylcode/code/methylcoder.py \
+                           --bowtie=/usr/local/src/bowtie/ \
+                            --reads /path/to/reads.fastq \
+                            --outdir out/   \
+                            /path/to/thaliana_v9.fasta 
 
-    $ cd code/
-    $ python methylcoder.py --bowtie=/path/to/bowtie \
-                            --reads /path/to/reads.raw \
-                            --outdir r/   \
-                            thaliana_v8.fasta 
-
+Where you must adjust `/path/to/` to the appropriate paths and `outdir` must exist.
 This will create the files specified in `Output`_ above, sending the text to 
-`r/methy-data-DATE.txt` where DATE is the current date. The binary files will
-be sent to, for example: thaliana_v8.fasta.[CHR].methyl.bin where [CHR] is 
+`out/methy-data-DATE.txt` where DATE is the current date. The binary files will
+be sent to, for example: `out/thaliana_v9.fasta.[CHR].methyl.bin` where [CHR] is 
 substituted by each chromosome in the fasta file. Once bowtie is run once,
 it's output is not deleted, and methylcoder.py will only re-run bowtie if its
 input has been modified since it was run last. *NOTE* if the `methylcoder.py`

@@ -4,7 +4,7 @@ the code in this file originally benefited from a read of the
 methodology in bsseeker.
 """
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 from pyfasta import Fasta
 import numpy as np
@@ -339,6 +339,7 @@ def convert_reads_c2t(reads_path):
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
     out = open(c2t, 'wb')
     for line in open(reads_path):
+        assert line.strip(), ("nothing in line from:", reads_path)
         out.write(line.replace('C', 'T'))
     out.close()
     return c2t, len(line.rstrip())
@@ -351,13 +352,32 @@ def make_header():
 #version: %s""" % (" ".join(sys.argv), datetime.date.today(), 
                    op.abspath("."), __version__)
 
+def fastq_to_raw(fastq):
+    assert op.exists(fastq), "make sure %s is correct path" % fastq
+    outf = fastq + ".raw"
+    if not is_up_to_date_b(fastq, outf):
+        out = open(outf, "w")
+        with open(fastq) as fh:
+            while True:
+                if not fh.readline(): break # header
+                line = fh.readline() # seq
+                fh.readline()
+                fh.readline()
+                assert not '@' in line
+                out.write(line)
+        out.close()
+        print >>sys.stderr, "wrote raw reads to '%s'" % (out.name)
+    else:
+        print >>sys.stderr, "using raw reads at '%s'" % (outf)
+    return outf
+
 
 if __name__ == "__main__":
     import optparse
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
-    p.add_option("--reads", dest="reads", help="path to reads file containing only sequence")
+    p.add_option("--reads", dest="reads", help="path to fastq reads file")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
 
@@ -387,7 +407,7 @@ if __name__ == "__main__":
     if preverse is not None: preverse.wait()
     if pforward is not None: pforward.wait()
 
-    raw_reads = opts.reads
+    raw_reads = fastq_to_raw(opts.reads)
     c2t_reads, read_len = convert_reads_c2t(raw_reads)  
     ref_forward = op.splitext(fforward_c2t)[0]
     ref_reverse = op.splitext(freverse_c2t)[0]
