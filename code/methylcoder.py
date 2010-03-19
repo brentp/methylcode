@@ -315,7 +315,7 @@ def write_sam_commands(out_dir, fasta):
     fh_lens.close()
     out = open("%s/commands.sam.sh" % out_dir, "w")
     print >> out, """\
-SAMTOOLS=~/src/samtools/samtools
+SAMTOOLS=/usr/local/src/samtools/samtools
 
 $SAMTOOLS view -b -t %(odir)s/chr.lengths.txt %(odir)s/methylcoded.sam \
         -o %(odir)s/methylcoded.unsorted.bam
