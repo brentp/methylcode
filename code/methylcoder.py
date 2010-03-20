@@ -20,6 +20,8 @@ import datetime
 np.seterr(divide="ignore")
 
 
+DASH_M = 1
+
 def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
     return s.translate(_comp)[::-1]
 
@@ -79,7 +81,7 @@ def is_up_to_date_b(a, b):
 def run_bowtie_builder(bowtie_path, fasta_path):
     d = os.path.dirname(fasta_path)
     p, ext = op.splitext(op.basename(fasta_path)) # some.fasta -> some, fasta
-    cmd = '%s/bowtie-build -f %s %s/%s > %s/%s.log' % \
+    cmd = '%s/bowtie-build -f %s %s/%s | tee %s/%s.bowtie-build.log' % \
                 (bowtie_path, fasta_path, d, p, d, p)
 
     if is_up_to_date_b(fasta_path, "%s/%s.1.ebwt" % (d, p)):
@@ -91,10 +93,11 @@ def run_bowtie_builder(bowtie_path, fasta_path):
 
 def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CPU_COUNT, **kwargs):
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
+    dash_M = DASH_M
     cmd = ("%(bowtie_path)s/bowtie --sam --sam-nohead " + \
-           " -v %(mismatches)d --norc -k1 --best " + \
-          "-p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
-          "%(sam_out_file)s") % locals() 
+           "--chunkmbs 256 -v %(mismatches)d --norc -M %(dash_M)s -k 1 " + \
+           "--best -p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
+          "%(sam_out_file)s | tee %(out_dir)s/bowtie.log") % locals()
     # TODO: can add a sort here by the first column so that later access to the
     # raw reads file will have better caching behavior. but pretty fast for now
     print >>sys.stderr, cmd.replace("//", "/")
@@ -102,11 +105,10 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
        is_up_to_date_b(reads_c2t, sam_out_file):
         print >>sys.stderr, "^ up to date, not running ^"
-        return sam_out_file
+        return sam_out_file, None
 
     process = Popen(cmd, shell=True)
-    process.wait()
-    return sam_out_file
+    return sam_out_file, process
 
 
 # <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> \
@@ -118,8 +120,13 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
     else:
         out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "a")
 
+    dash_m_pat = "XM:i:%i" % (DASH_M + 1)
+
     for sline in open(sam_aln_file):
+        # comment.
         if sline[0] == "@": continue
+        # it was excluded because of -M
+        if dash_m_pat in sline: continue
         line = sline.split("\t")
         # no reported alignments.
         if line[1] == '4': continue 
@@ -173,7 +180,6 @@ def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
 
     paths = [ out_dir + "/" + opath + ".%s.c.bin",
               out_dir + "/" + opath + ".%s.t.bin",
-              out_dir + "/" + opath + ".%s.methyl.bin",
               out_dir + "/" + opath + ".%s.methyltype.bin" ]
     if out_dir == '':
         return [p.lstrip("/") for p in paths]
@@ -194,8 +200,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
  
-    # get the 4 possible binary files for each chr
-    fc, ft, fmethyl, fmethyltype = \
+    # get the 3 possible binary files for each chr
+    fc, ft, fmethyltype = \
             bin_paths_from_fasta(original_fasta, out_dir)
 
     counts = {}
@@ -411,14 +417,20 @@ if __name__ == "__main__":
     c2t_reads, read_len = convert_reads_c2t(raw_reads)  
     ref_forward = op.splitext(fforward_c2t)[0]
     ref_reverse = op.splitext(freverse_c2t)[0]
-    forward_sam = run_bowtie(opts.bowtie, ref_forward, opts.out_dir,
-                             c2t_reads, opts.mismatches)
-    reverse_sam = run_bowtie(opts.bowtie, ref_reverse, opts.out_dir,
-                             c2t_reads, opts.mismatches)
     try:
+
+        forward_sam, fprocess = run_bowtie(opts.bowtie, ref_forward,
+                               opts.out_dir, c2t_reads, opts.mismatches)
+        # wait for forward process to finish. then calculate.
+        fprocess and fprocess.wait()
+        reverse_sam, rprocess = run_bowtie(opts.bowtie, ref_reverse,
+                               opts.out_dir, c2t_reads, opts.mismatches)
+        # start tabulating forward results.
         count_conversions(fasta, 'f', forward_sam, raw_reads, opts.out_dir,
                           opts.mismatches,
                           read_len)
+        # then wait for reverse process to finished. before tabulating.
+        rprocess and rprocess.wait()
         count_conversions(fasta, 'r', reverse_sam, raw_reads, opts.out_dir,
                       opts.mismatches,
                       read_len)
