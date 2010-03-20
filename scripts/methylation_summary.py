@@ -1,5 +1,6 @@
 import sys
-sys.path.insert(0, "/home/brentp/src/methylcode/code")
+import os.path as op
+sys.path.insert(0, op.join(op.dirname(__file__), "../code"))
 from methyl import MethylGroup
 mg = MethylGroup(sys.argv[1])
  
