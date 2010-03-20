@@ -115,10 +115,6 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
 #        <ISIZE> <SEQ> <QUAL> \ [<TAG>:<VTYPE>:<VALUE> [...]]
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
 def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
-    if direction == 'f':
-        out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "w")
-    else:
-        out = open(op.dirname(sam_aln_file) + "/methylcoded.sam", "a")
 
     dash_m_pat = "XM:i:%i" % (DASH_M + 1)
 
@@ -131,6 +127,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
         # no reported alignments.
         if line[1] == '4': continue 
         assert line[1] == '0', line
+        assert line[4] != '0', ( 'quality of zero', line)
 
         read_id = int(line[0])
         seqid = line[2]
@@ -145,7 +142,6 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
 
         if direction == 'f':
             line[9] = raw_seq
-            print >>out, sline,
         else:
             pos0 = chr_lengths[seqid] - pos0 - read_len
             line[3] = str(pos0 + 1)
@@ -153,7 +149,6 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
             line[9] = raw_seq = revcomp(raw_seq)
             line[1] = '16' # alignment on reverse strand.
             converted_seq = revcomp(converted_seq)
-            print >>out, "\t".join(line),
 
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
@@ -166,8 +161,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
             nmiss=nmiss,
             read_sequence=converted_seq,
             raw_read=raw_seq,
-        )
-    out.close()
+        ), line
 
 def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     """
@@ -199,6 +193,9 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     fh_c2t_reads = open(raw_reads + ".c2t", 'r')
 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
+    mode = 'a' if direction == 'r' else 'w'
+
+    out_sam = open(out_dir + "/methylcoded.sam", mode)
  
     # get the 3 possible binary files for each chr
     fc, ft, fmethyltype = \
@@ -222,7 +219,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     skipped = 0
     align_count = 0
     pairs = "CT" if direction == "f" else "GA" # 
-    for p in parse_sam(sam_file, direction, chr_lengths, fh_raw_reads,
+    for p, sam_line in parse_sam(sam_file, direction, chr_lengths, fh_raw_reads,
                        read_len):
         # read_id is also the line number from the original file.
         read_id = p['read_id']
@@ -261,10 +258,14 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         # these errors cause the number of mismatches to exceed the number of
         # allowed mismatches, we dont include the stats for this read.
         remaining_mismatches = allowed_mismatches - current_mismatches
-        skipped += _update_conversions(genomic_ref, raw, pos0, pairs, 
+        this_skipped = _update_conversions(genomic_ref, raw, pos0, pairs,
                                        counts[p['seqid']]['c'], 
                                        counts[p['seqid']]['t'],
                                       remaining_mismatches, read_len)
+        if this_skipped == 0:
+            # only print the line to the sam file if we use it in our calcs.
+            print >>out_sam, "\t".join(sam_line)
+        skipped += this_skipped
         if DEBUG:
             raw_input("press any key...\n")
 
