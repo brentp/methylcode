@@ -2,15 +2,13 @@ from fisher import pvalue_npy, pvalue
 import sys
 import os.path as op
 sys.path.insert(0, op.join(op.dirname(__file__), "../code"))
-from methyl import Methyl
+from methyl import MethylGroup
 import numpy as np
 
-# m == mutant
-# w == wildtype
 def bin_setup(chr, adir, bdir, context='CG'):
-    am = Methyl(adir)
-    bm = Methyl(bdir)
-    return am.as_context(context), bm.as_context(bm)
+    am = MethylGroup(adir)[chr]
+    bm = MethylGroup(bdir)[chr]
+    return am.as_context(context), bm.as_context(context)
 
 def difference_compare(w_ts, w_cs, m_ts, m_cs):
     w_meth = w_cs.astype('f')/ (w_cs + w_ts)
@@ -123,23 +121,23 @@ def run_accn_gff(flat, mpatt, wpatt):
                         (row['accn'], pv, w_t_count, w_c_count, m_t_count, m_c_count, gc)
             print >>fh, "\t".join(map(str, [chr, "fischerlab", "gene", row['start'], row['end'], ".", row['strand'], ".", attrs]))
 
-def run_50bp_gff(flat, adir, bdir, window=50):
-    fh = open('fisher.different.%ibp.gff' % window, 'w')
+def run_50bp_gff(flat, adir, bdir, context, window=50):
+    fh = open('fisher.different.%s.%ibp.gff' % (context, window), 'w')
+    print >>sys.stderr, "writing to:", fh.name
     print >>fh, "##gff-version 3"
     for i in range(1, 6):
         chr = str(i)
         bp_max = len(flat.fasta[chr])
-        (a_cs, a_ts, a_mask), (b_cs, b_ts, b_mask) = bin_setup(chr, adir, bdir)
+        (a_cs, a_ts, a_mask), (b_cs, b_ts, b_mask) = bin_setup(chr, adir, bdir, context)
         for start in range(0, bp_max + window, window):
             end = min(start + window, bp_max)
-            a_t_count = a_ts[a_mask][start:end].sum()
-            a_c_count = a_cs[a_mask][start:end].sum()
-            b_t_count = b_ts[b_mask][start:end].sum()
-            b_c_count = b_cs[b_mask][start:end].sum()
+            a_t_count = a_ts[start:end].sum()
+            a_c_count = a_cs[start:end].sum()
+            b_t_count = b_ts[start:end].sum()
+            b_c_count = b_cs[start:end].sum()
 
             p = pvalue(a_t_count, a_c_count, b_t_count, b_c_count)
             pv = p.two_tail
-            #print [[w_t_count, w_c_count], [m_t_count, m_c_count]], p
             if pv > 0.01: continue
             gc = f.fasta[chr][start:end].upper()
             gc = gc.count("G") + gc.count("C")
@@ -156,7 +154,6 @@ def run_50bp_gff(flat, adir, bdir, window=50):
             if accns:
                 attrs +=";accns=" + ",".join(accns)
             print >>fh, "\t".join(map(str, [chr, "methylation", "dmc", start + 1, end, plot, strand, ".", attrs]))
-            #print "\t".join(map(str, [chr, "fischerlab", "dmc", start + 1, end, ".", strand, ".", attrs]))
     
 
 def run_all(flat, mpatt, wpatt):
@@ -186,6 +183,7 @@ def run_all(flat, mpatt, wpatt):
 
 if __name__ == "__main__":
     from flatfeature import Flat
+    #f = Flat("/opt/src/athly/data/thaliana_v9.flat", "/opt/src/athly/data/thaliana_v9.fasta")
     f = Flat("/labdata/thaliana_v9/thaliana_v9.flat", "/labdata/thaliana_v9/thaliana_v9.fasta")
     import sys
     #run_all(f, "out5678n/thaliana_v9.%s.converted.bin",
@@ -194,5 +192,5 @@ if __name__ == "__main__":
     #           "out1234n/thaliana_v9.%s.converted.bin")
     #run_accn_gff(f, "out5678n/thaliana_v9.%s.converted.bin",
     #                "out1234n/thaliana_v9.%s.converted.bin")
-    run_50bp_gff(f, sys.argv[1], sys.argv[2])
+    run_50bp_gff(f, sys.argv[1], sys.argv[2], sys.argv[3].upper())
 
