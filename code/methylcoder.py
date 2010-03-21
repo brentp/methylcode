@@ -20,8 +20,6 @@ import datetime
 np.seterr(divide="ignore")
 
 
-DASH_M = 1
-
 def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
     return s.translate(_comp)[::-1]
 
@@ -91,15 +89,20 @@ def run_bowtie_builder(bowtie_path, fasta_path):
     return process
 
 
-def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CPU_COUNT, **kwargs):
+def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
+    out_dir = opts.out_dir
+    bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
-    dash_M = DASH_M
+    mismatches = opts.mismatches
     cmd = ("%(bowtie_path)s/bowtie --sam --sam-nohead " + \
-           "--chunkmbs 256 -v %(mismatches)d --norc -M %(dash_M)s -k 1 " + \
-           "--best -p %(threads)d %(ref_path)s  -r %(reads_c2t)s " + \
-          "%(sam_out_file)s | tee %(out_dir)s/bowtie.log") % locals()
-    # TODO: can add a sort here by the first column so that later access to the
-    # raw reads file will have better caching behavior. but pretty fast for now
+           "--chunkmbs 1024 -v %(mismatches)d --norc " + \
+           "--best -p %(threads)d %(ref_path)s -r %(reads_c2t)s") % locals()
+
+    if opts.k > 0: cmd += " -k %i" % opts.k
+    if opts.M > 0: cmd += " -M %i" % opts.M
+    elif opts.m > 0: cmd += " -m %i" % opts.m
+
+    cmd += " %(sam_out_file)s | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
 
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
@@ -111,23 +114,20 @@ def run_bowtie(bowtie_path, ref_path, out_dir, reads_c2t, mismatches, threads=CP
     return sam_out_file, process
 
 
-# <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> \
-#        <ISIZE> <SEQ> <QUAL> \ [<TAG>:<VTYPE>:<VALUE> [...]]
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
 def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
 
-    dash_m_pat = "XM:i:%i" % (DASH_M + 1)
 
     for sline in open(sam_aln_file):
         # comment.
         if sline[0] == "@": continue
         # it was excluded because of -M
-        if dash_m_pat in sline: continue
         line = sline.split("\t")
         # no reported alignments.
         if line[1] == '4': continue 
+        # extra found via -M
+        if line[4] == '0': continue 
         assert line[1] == '0', line
-        assert line[4] != '0', ( 'quality of zero', line)
 
         read_id = int(line[0])
         seqid = line[2]
@@ -392,6 +392,9 @@ if __name__ == "__main__":
              help="number of mismatches allowed. sent to bowtie executable")
     p.add_option("--fasta", dest="fasta",
              help="path to fasta file to which to align reads")
+    p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=1)
+    p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=-1)
+    p.add_option("-M", dest="M", type='int', help="bowtie's -M parameter", default=-1)
 
     opts, args = p.parse_args()
 
@@ -420,12 +423,10 @@ if __name__ == "__main__":
     ref_reverse = op.splitext(freverse_c2t)[0]
     try:
 
-        forward_sam, fprocess = run_bowtie(opts.bowtie, ref_forward,
-                               opts.out_dir, c2t_reads, opts.mismatches)
+        forward_sam, fprocess = run_bowtie(opts, ref_forward, c2t_reads)
         # wait for forward process to finish. then calculate.
         fprocess and fprocess.wait()
-        reverse_sam, rprocess = run_bowtie(opts.bowtie, ref_reverse,
-                               opts.out_dir, c2t_reads, opts.mismatches)
+        reverse_sam, rprocess = run_bowtie(opts, ref_reverse, c2t_reads)
         # start tabulating forward results.
         count_conversions(fasta, 'f', forward_sam, raw_reads, opts.out_dir,
                           opts.mismatches,
