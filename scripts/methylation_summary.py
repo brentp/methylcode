@@ -51,7 +51,7 @@ ymax=M['CHH'] + P['CHH']
 CGPCT=int(100 * M['CG'] / P['CG'] + 0.5)
 CHGPCT=int(100 * M['CHG'] / P['CHG'] + 0.5)
 CHHPCT=int(100 * M['CHH'] / P['CHH'] + 0.5)
-print """
+chart = """\
 cht=bvs
 chs=350x350
 chbh=a
@@ -70,3 +70,5 @@ chm=tMethylated,000000,0,2,12|tTotal+Sites,000000,1,2,12
            CGP=P['CG'], CHGP=P['CHG'], CHHP=P['CHH'],
            ymax=ymax, CGPCT=CGPCT, CHGPCT=CHGPCT, CHHPCT=CHHPCT)
 
+chart = 'http://chart.apis.google.com/chart?' + chart.replace("\n|", "").replace("\n", "&")
+print chart
