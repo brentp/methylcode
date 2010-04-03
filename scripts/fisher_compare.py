@@ -192,5 +192,9 @@ if __name__ == "__main__":
     #           "out1234n/thaliana_v9.%s.converted.bin")
     #run_accn_gff(f, "out5678n/thaliana_v9.%s.converted.bin",
     #                "out1234n/thaliana_v9.%s.converted.bin")
-    run_50bp_gff(f, sys.argv[1], sys.argv[2], sys.argv[3].upper())
+    if len(sys.argv) > 4:
+        window = int(sys.argv[4])
+    else:
+        window = 50
+    run_50bp_gff(f, sys.argv[1], sys.argv[2], sys.argv[3].upper(), window)
 
