@@ -153,6 +153,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
         nmiss = int(NM[-1])
+        line[-1] = line[-1].rstrip()
         yield dict(
             read_id=read_id,
             seqid=line[2],
