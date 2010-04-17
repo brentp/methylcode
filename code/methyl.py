@@ -67,7 +67,7 @@ class MethylGroup(object):
 
 
     def _setup_paths(self, prefix):
-        assert op.isdir(prefix): # prefix is a dir
+        assert op.isdir(prefix) # prefix is a dir
         self.dir = prefix.rstrip("/") + "/"
         files = glob.glob("%s*methyltype.bin" % self.dir)
         prefix = op.basename(files[0].replace(".methyltype.bin", ""))
@@ -111,9 +111,7 @@ class Methyl(object):
         """context is either an integer from 1 to 6, or a string of:
         CG, CHG or CGG
         returns cs, ts, mask
-        where cs and ts are masked (to zero) except for the requested context. 
-        and mask is True at sites in the requested context and False in all other 
-        positions.
+        where cs and ts are masked (to zero) except for the requested context.        and mask is True at sites in the requested context and False in all other        positions.
         """
         if isinstance(context, basestring):
             context = Methyl.contexts[context.upper()]
@@ -131,7 +129,6 @@ class Methyl(object):
         cs[~no_mask] = 0
         ts[~no_mask] = 0
         return cs, ts, no_mask
-        
 
     def __repr__(self):
         return "Methyl(%s, %ibp)" % (self.seqid, len(self.ts))
