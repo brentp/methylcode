@@ -38,6 +38,17 @@ import os.path as op
 import glob
 from pyfasta import Fasta
 
+def get_pattern(dir):
+    dir = dir.rstrip("/") + "/"
+    files = glob("%s*methyltype.bin" % dir)
+    prefix = op.basename(files[0].replace(".methyltype.bin", ""))
+    prefix = ".".join(prefix.split(".")[:-1])
+    files = (op.basename(f).replace('.methyltype.bin', '') for f in files)
+    seqids = sorted(f.replace(prefix + ".", "") for f in files)
+    pattern = prefix + ".%s.%s.bin"
+    return pattern
+
+
 class MethylGroup(object):
     __slots__ = ('dir', # directory containing the .bin files.
               'prefix', # e.g.: thaliana_v9 (then files are thaliana_v9.1.total.bin)
@@ -56,17 +67,11 @@ class MethylGroup(object):
 
 
     def _setup_paths(self, prefix):
-        if op.isdir(prefix): # prefix is a dir
-            self.dir = prefix.rstrip("/") + "/"
-            files = glob.glob("%s*methyltype.bin" % self.dir)
-            prefix = op.basename(files[0].replace(".methyltype.bin", ""))
-            self.prefix = ".".join(prefix.split(".")[:-1])
-
-        else: # prefix is a dir/start_of_name
-            prefix = prefix.rstrip(".")
-            self.dir = op.dirname(prefix) + "/"
-            self.prefix = op.basename(prefix)
-            files = glob.glob(prefix + "*.methyltype.bin")
+        assert op.isdir(prefix): # prefix is a dir
+        self.dir = prefix.rstrip("/") + "/"
+        files = glob.glob("%s*methyltype.bin" % self.dir)
+        prefix = op.basename(files[0].replace(".methyltype.bin", ""))
+        self.prefix = ".".join(prefix.split(".")[:-1])
 
         files = (op.basename(f).replace('.methyltype.bin', '') for f in files)
         self.seqids = sorted(f.replace(self.prefix + ".", "") for f in files)
