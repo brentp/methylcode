@@ -12,9 +12,9 @@ class FileIndex(object):
         db = BDB()
         db.open(filename + cls.ext, bnum=bnum, lcnum=2**19,
                 omode=tc.OWRITER | tc.OTRUNC | tc.OCREAT,
-                apow=6, opts=tc.TLARGE, xmsiz=2**26)        
-        pos = fh.tell()
+                apow=6, opts=tc.TLARGE, xmsiz=2**26)
         putter = db.putcat if allow_multiple else db.put
+        pos = fh.tell()
         while True:
             key = get_next(fh)
             if not key: break
@@ -35,16 +35,21 @@ class FileIndex(object):
 
     def __getitem__(self, key):
         # every key has the | appended.
-        pos = self.db.get(key, None, True, str).rstrip("|")
+        pos = self.db.get(key, None, True, str)
+        if pos is None: raise KeyError(key)
+        pos = pos.rstrip("|")
         if self.allow_multiple:
             results = []
             for p in pos.split("|"):
                 self.fh.seek(long(p))
                 results.append(self.call_class(self.fh))
             return results
-                
+
         self.fh.seek(long(pos))
         return self.call_class(self.fh)
+
+    def __contains__(self, key):
+        return self.db.get(key, False, True, str)
 
 if __name__ == "__main__":
     import time
