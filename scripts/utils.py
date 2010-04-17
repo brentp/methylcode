@@ -10,13 +10,20 @@ def grouper(qstr):
         else: yield item
 
 class SamLine(object):
-    def __init__(self, line):
+    __slots__ = ("qname", "read_id", "flag", "ref", "ref_pos", "seq",
+                 "fields", "mismatches", "mismatch_locs", "line")
+    def __init__(self, fh):
+        line = fh.readline().strip()
+        if not line:
+            self.read_id = None
+            return None
+        self.line = line
         line = line.split("\t")
-        self.qname = self.name = line[0]
+        self.qname = self.read_id = int(line[0])
         self.flag = int(line[1])
-        self.ref = self.rname = line[2]
+        self.ref = line[2]
         # 1-based
-        self.pos = int(line[3])
+        self.ref_pos = int(line[3])
         """ unused for now.
         self.mapq = int(line[4])
         self.cigar = line[5]
