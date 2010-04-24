@@ -16,7 +16,6 @@ python module: py-tcdb
 """
 
 import sys
-import os
 import os.path as op
 dir = op.dirname(__file__)
 sys.path = [dir, op.join(dir, "lib")] + sys.path
@@ -30,13 +29,7 @@ def fast_sam(fh):
 
 def unique_b(sam_a, sam_b):
 
-    if not op.exists(sam_a + FileIndex.ext):
-        try: FileIndex.create(sam_a, fast_sam, allow_multiple=True)
-        except:
-            os.unlink(sam_a + FileIndex.ext)
-            raise
-
-    aidx = FileIndex(sam_a, fast_sam, allow_multiple=True)
+    aidx = FileIndex(sam_a, fast_sam, fast_sam)
     out_b = open(sam_b.replace(".sam", ".better.sam"), "w")
     print "writing to %s" % out_b.name
     unique = 0

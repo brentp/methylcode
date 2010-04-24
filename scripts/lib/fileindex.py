@@ -1,55 +1,63 @@
-from tcdb.bdb import BDB
-import tcdb.bdb as tc
+import bsddb
+import os
+
+def is_up_to_date_b(a, b):
+    if not os.path.exists(b): return False
+    return os.stat(a).st_mtime <= os.stat(b).st_mtime
 
 class FileIndex(object):
     ext = ".fidx"
+
+    def is_current(self):
+        return is_up_to_date_b(self.filename, self.filename + self.ext)
+
     @classmethod
-    def create(cls, filename, get_next, allow_multiple=False):
+    def create(cls, filename, get_next_pos):
         fh = open(filename)
         lines = sum(1 for line in fh)
         bnum = lines if lines > 2**24 else lines * 2
         fh.seek(0)
-        db = BDB()
-        db.open(filename + cls.ext, bnum=bnum, lcnum=2**19,
-                omode=tc.OWRITER | tc.OTRUNC | tc.OCREAT,
-                apow=6, opts=tc.TLARGE, xmsiz=2**26)
-        putter = db.putcat if allow_multiple else db.put
+        db = bsddb.btopen(filename + cls.ext, 'n', cachesize=32768*2,
+                          pgsize=512)
         pos = fh.tell()
         while True:
-            key = get_next(fh)
+            key = get_next_pos(fh)
             if not key: break
             # always append the | but only used by multiple.
-            putter(key , str(pos) + "|", True, True)
+            db[key] = str(pos)
             # fh has been moved forward by get_next.
             pos = fh.tell()
         fh.close()
         db.close()
 
-    def __init__(self, filename, call_class, allow_multiple=False):
+    def __init__(self, filename, call_class, get_next_pos):
         self.filename = filename
-        self.allow_multiple = allow_multiple
         self.fh = open(self.filename)
         self.call_class = call_class
-        self.db = BDB()
-        self.db.open(filename + self.ext, omode=tc.OREADER)
+        if not self.is_current():
+            try:
+                FileIndex.create(self.filename, get_next_pos)
+            except:
+                os.unlink(self.filename + self.ext)
+                raise
+
+        self.db = bsddb.btopen(filename + self.ext, 'r')
 
     def __getitem__(self, key):
         # every key has the | appended.
-        pos = self.db.get(key, None, True, str)
+        pos = self.db.get(key, None)
         if pos is None: raise KeyError(key)
-        pos = pos.rstrip("|")
-        if self.allow_multiple:
-            results = []
-            for p in pos.split("|"):
-                self.fh.seek(long(p))
-                results.append(self.call_class(self.fh))
-            return results
-
         self.fh.seek(long(pos))
         return self.call_class(self.fh)
 
-    def __contains__(self, key):
-        return self.db.get(key, False, True, str)
+    def __len__(self):
+        return len(self.db)
+
+    def __iter__(self):
+        return self.db.iteritems()
+
+    def iterkeys(self):
+        return self.db.iterkeys()
 
 if __name__ == "__main__":
     import time
@@ -61,23 +69,16 @@ if __name__ == "__main__":
             self.l3 = fh.readline().rstrip('\r\n')
             self.qual = fh.readline().rstrip('\r\n')
  
-    def get_next(fh):
-        name = fh.readline().strip()
-        fh.readline(); fh.readline(); fh.readline()
-        return name or None
-    #f = '/usr/local/src/methylcode/500K.fastq'
-    f = '/usr/local/src/bowtie/bowtie-0.12.1/work/reads/s_1_sequence.txt'
+    f = '/usr/local/src/methylcode/500K.fastq'
+    #f = '/usr/local/src/bowtie/bowtie-0.12.1/work/reads/s_1_sequence.txt'
 
-    t = time.time()
-    #FileIndex.create(f, lambda fh: FastQEntry(fh).name)
-    print time.time() - t
-
-    fi = FileIndex(f, FastQEntry)
-    N = 1000000 
+    fi = FileIndex(f, FastQEntry, lambda fh: FastQEntry(fh).name)
+    print "items in index:", len(fi)
+    N = 10000 
     NKeys = N
     print "getting %i keys..." % N
 
-    it = fi.db.iterkeys(str)
+    it = fi.iterkeys()
     keys = [it.next() for i in xrange(N)]
     import random
     print "shuffling"
