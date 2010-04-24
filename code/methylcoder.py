@@ -4,7 +4,7 @@ the code in this file originally benefited from a read of the
 methodology in bsseeker.
 """
 
-__version__ = "0.2.3"
+__version__ = "0.2.5"
 
 from pyfasta import Fasta
 import numpy as np
@@ -35,44 +35,42 @@ except ImportError:
 
 def write_c2t(fasta_name):
     """
-    given a fasta file and write 2 new files. given some.fasta:
-        `some.forward.c2t.fasta` contains the same headers but all C's 
-                                 converted to T
-        `some.reverse.c2t.fasta` contains the reverse-complemented sequece
-                                 with all C's converted to T.
+    given a fasta file, write a new: 
+        `some.fr.c2t.fasta` which contains:
+          + the same headers prefixed with 'f' with all C's converted to T
+          + headers prefixed with 'r' reverse complemented with
+                                 all C's converted to T.
     """
     d = op.join(op.dirname(fasta_name), "bowtie_index")
     if not op.exists(d): os.mkdir(d)
 
     p, ext = op.splitext(op.basename(fasta_name)) # some.fasta -> some, fasta
-    revname = "%s/%s.reverse.c2t%s" % (d, p, ext)
-    forname = "%s/%s.forward.c2t%s" % (d, p, ext)
-    if op.exists(revname) and op.exists(forname): return forname, revname
+    fname = "%s/%s.fr.c2t%s" % (d, p, ext)
+    if op.exists(fname): return fname
     fasta = Fasta(fasta_name)
 
-    reverse_fh = open(revname, 'w')
-    forward_fh = open(forname, 'w')
-    print >>sys.stderr, "writing: %s, %s" % (revname, forname)
+    c2t_fh = open(fname, 'w')
+    print >>sys.stderr, "writing forward and reverse c2t to: %s" % (fname,)
 
     try:
         for header in fasta.iterkeys():
             seq = str(fasta[header]).upper()
             assert not ">" in seq
-            print >>reverse_fh, ">%s" % header
-            print >>forward_fh, ">%s" % header
+            # c2t, prefix header with f and write
+            print >>c2t_fh, ">f%s" % header
+            print >>c2t_fh, seq.replace('C', 'T')
+            # then r-c, c2t, prefix header with r and write
+            print >>c2t_fh, ">r%s" % header
+            print >>c2t_fh, revcomp(seq).replace('C', 'T')
 
-            print >>reverse_fh, revcomp(seq).replace('C', 'T')
-            print >>forward_fh, seq.replace('C', 'T')
-
-        reverse_fh.close(); forward_fh.close()
+        c2t_fh.close()
     except:
-        try: reverse_fh.close(); forward_fh.close()
+        try: c2t_fh.close()
         except: pass
-        os.unlink(revname)
-        os.unlink(forname)
+        os.unlink(fname)
         raise
 
-    return forname, revname
+    return fname
 
 def is_up_to_date_b(a, b):
     return op.exists(b) and os.stat(b).st_mtime >= os.stat(a).st_mtime
@@ -88,8 +86,7 @@ def run_bowtie_builder(bowtie_path, fasta_path):
         return None
     print >>sys.stderr, "running: %s" % cmd
     process = Popen(cmd, shell=True)
-    return process
-
+    process.wait()
 
 def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
     out_dir = opts.out_dir
@@ -110,14 +107,15 @@ def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
        is_up_to_date_b(reads_c2t, sam_out_file):
         print >>sys.stderr, "^ up to date, not running ^"
-        return sam_out_file, None
+        return sam_out_file
 
     process = Popen(cmd, shell=True)
-    return sam_out_file, process
+    process.wait()
+    return sam_out_file
 
 
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file, direction, chr_lengths, get_records):
+def parse_sam(sam_aln_file, chr_lengths, get_records):
 
     for sline in open(sam_aln_file):
         # comment.
@@ -132,6 +130,12 @@ def parse_sam(sam_aln_file, direction, chr_lengths, get_records):
 
         read_id = line[0]
         seqid = line[2]
+        direction = seqid[0]
+        assert direction in 'fr'
+
+        seqid = seqid[1:]
+        line[2] = seqid
+
         pos0 = int(line[3]) - 1
         converted_seq = line[9]
 
@@ -168,7 +172,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, get_records):
             nmiss=nmiss,
             read_sequence=converted_seq,
             raw_read=raw_seq,
-        ), line, read_len
+        ), line, read_len, direction
 
 def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     """
@@ -195,14 +199,12 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
     fh_raw_reads.seek(fpos)
     fh_c2t_reads.seek(fpos)
     return FastQEntry(fh_raw_reads), FastQEntry(fh_c2t_reads)
-
-def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
+   
+def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
                       allowed_mismatches):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
-    assert direction in 'fr'
-    print >>sys.stderr, "tabulating %s methylation for %s" % \
-            (direction, original_fasta)
+    print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
 
     fqidx = FastQIndex(raw_reads + ".c2t")
     fa = Fasta(original_fasta)
@@ -214,9 +216,8 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
 
 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
-    mode = 'a' if direction == 'r' else 'w'
 
-    out_sam = open(out_dir + "/methylcoded.sam", mode)
+    out_sam = open(out_dir + "/methylcoded.sam", 'w')
  
     # get the 3 possible binary files for each chr
     fc, ft, fmethyltype = \
@@ -228,20 +229,16 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         # here we add to fc and ft np.fromfile() from the forward,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
-        if direction == 'r':
-            counts[k] = {'t': np.fromfile(ft % k, dtype=np.uint32),
-                         'c': np.fromfile(fc % k, dtype=np.uint32)}
-        else:
-            counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
-                         # total reads in which this c changed to t 
-                         'c': np.zeros((len(fa[k]),), dtype=np.uint32)}
+        counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
+                     # total reads in which this c changed to t 
+                     'c': np.zeros((len(fa[k]),), dtype=np.uint32)}
         assert len(fa[k]) == len(counts[k]['t']) == len(counts[k]['c'])
 
     skipped = 0
     align_count = 0
-    pairs = "CT" if direction == "f" else "GA" # 
-    for p, sam_line, read_len in parse_sam(sam_file, direction, chr_lengths, get_records):
+    for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths, get_records):
         # read_id is also the line number from the original file.
+        pairs = "CT" if direction == "f" else "GA" # 
         read_id = p['read_id']
         pos0 = p['pos0']
         align_count += 1
@@ -295,11 +292,10 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
             "skipped %i alignments (%.3f%%) where read T mapped to genomic C" % \
                   (skipped, 100.0 * skipped / align_count)
 
-    if direction == 'r':
-        out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
+    out = open(op.dirname(fmethyltype) + "/methyl-data-%s.txt" \
                     % datetime.date.today(), 'w')
-        print >>out, make_header()
-        print >>out, "#seqid\tmt\tbp\tc\tt"
+    print >>out, make_header()
+    print >>out, "#seqid\tmt\tbp\tc\tt"
 
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
@@ -314,16 +310,15 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         cs.tofile(fc % seqid)
         ts.tofile(ft % seqid)
 
-        if direction == 'r':
-            file_pat = bin_paths_from_fasta(original_fasta, out_dir, 
-                                            pattern_only=True)
+        file_pat = bin_paths_from_fasta(original_fasta, out_dir, 
+                                        pattern_only=True)
 
-            print >>sys.stderr, "#> writing:", file_pat % seqid
+        print >>sys.stderr, "#> writing:", file_pat % seqid
 
-            seq = str(fa[seqid])
-            mtype = calc_methylation(seq)
-            mtype.tofile(fmethyltype % seqid)
-            to_text_file(cs, ts, mtype, seqid, out)
+        seq = str(fa[seqid])
+        mtype = calc_methylation(seq)
+        mtype.tofile(fmethyltype % seqid)
+        to_text_file(cs, ts, mtype, seqid, out)
 
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
@@ -434,29 +429,16 @@ if __name__ == "__main__":
                 "the existing .bin files from %s" % opts.out_dir
         sys.exit(1)
 
-    fforward_c2t, freverse_c2t = write_c2t(fasta)
-    pforward = run_bowtie_builder(opts.bowtie, fforward_c2t)
-    preverse = run_bowtie_builder(opts.bowtie, freverse_c2t)
-    if preverse is not None: preverse.wait()
-    if pforward is not None: pforward.wait()
+    fr_c2t = write_c2t(fasta)
+    run_bowtie_builder(opts.bowtie, fr_c2t)
 
     raw_reads = opts.reads
     c2t_reads, c2t_index = convert_reads_c2t(raw_reads)  
-    ref_forward = op.splitext(fforward_c2t)[0]
-    ref_reverse = op.splitext(freverse_c2t)[0]
+    ref_base = op.splitext(fr_c2t)[0]
     try:
 
-        forward_sam, fprocess = run_bowtie(opts, ref_forward, c2t_reads)
-        # wait for forward process to finish. then calculate.
-        fprocess and fprocess.wait()
-        reverse_sam, rprocess = run_bowtie(opts, ref_reverse, c2t_reads)
-        # start tabulating forward results.
-        count_conversions(fasta, 'f', forward_sam, raw_reads, opts.out_dir,
-                          opts.mismatches)
-        # then wait for reverse process to finished. before tabulating.
-        rprocess and rprocess.wait()
-        count_conversions(fasta, 'r', reverse_sam, raw_reads, opts.out_dir,
-                      opts.mismatches)
+        sam = run_bowtie(opts, ref_base, c2t_reads)
+        count_conversions(fasta, sam, raw_reads, opts.out_dir, opts.mismatches)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
