@@ -130,8 +130,8 @@ def calc_stats(mfiles_pat, gff):
 
 if __name__ == "__main__":
 
-    # adjust these accordingly.
-    methpat = "/home/brentp/work/bisulfite/fractionation/data/at.%s.methyl.bin"
-    gff = "data/thaliana_v9_genes.gff"
+    # adjust this accordingly.
+    methpat = "/usr/local/src/methylcode/out1234n/thaliana_v9.%s.methyl.bin"
 
+    gff = "/labdata/thaliana_v9/thaliana_v9_genes.gff"
     calc_stats(methpat, gff)

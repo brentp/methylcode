@@ -20,17 +20,20 @@ def run_50bp_gff(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio
         (a_cs, a_ts, a_mask), (b_cs, b_ts, b_mask) = bin_setup(chr, adir, bdir, context)
         for start in xrange(0, bp_max + window, window):
             end = min(start + window, bp_max)
+            if start == end: continue
             a_t_count = a_ts[start:end].sum()
             a_c_count = a_cs[start:end].sum()
             b_t_count = b_ts[start:end].sum()
             b_c_count = b_cs[start:end].sum()
 
             p = pvalue(a_t_count, a_c_count, b_t_count, b_c_count)
-            pv = p.two_tail
+            pv = float(p.two_tail)
+
             if not binary and pv > pvalue_cutoff: continue
             gc = f.fasta[chr][start:end].upper()
             gc = gc.count("G") + gc.count("C")
 
+            # if a_tot or b_tot == 0, then use 'na'
             a_tot = float(a_c_count + a_t_count)
             a_methyl = (a_c_count / a_tot) if a_tot != 0 else None
 
@@ -39,20 +42,26 @@ def run_50bp_gff(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio
             #strand = "+" if a_methyl > b_methyl else "-"
             strand = "."
             # TODO: use absolute?
-            plot = abs(a_methyl - b_methyl) if not None in (a_methyl, b_methyl) else 'na'
+            plot = a_methyl - b_methyl if not None in (a_methyl, b_methyl) else 'na'
+
             #print plot, a_methyl, b_methyl
-            if plot == 'na': continue
-            if not (ratio_range[0] <= plot <= ratio_range[1]): continue
-
+            #if plot == 'na': continue
             if binary:
-                plot = 0 if pv > p.two_tail else 1
+                if plot != 'na':
+                    plot == 1 if (ratio_range[0] <= plot <= ratio_range[1]) else 0
+            else:
+                if not (ratio_range[0] <= plot <= ratio_range[1]): continue
 
-            attrs="p=%.3g;ac=%i;at=%i;bc=%i;bt=%i;gc=%i" % \
+            if binary and plot != 'na': plot = 0 if pv > pvalue_cutoff else 1
+
+            attrs="p=%.3G;ac=%i;at=%i;bc=%i;bt=%i;gc=%i" % \
                         (pv, a_c_count, a_t_count, b_c_count, b_t_count, gc)
+            """
             accns = flat.get_features_in_region(chr, start + 1, end)
             accns = [a["accn"] for a in accns]
             if accns:
                 attrs +=";accns=" + ",".join(accns)
+            """
             print >>fh, "\t".join(map(str, [chr, "methylation", "dmc", start + 1, end, plot, strand, ".", attrs]))
 
 if __name__ == "__main__":
