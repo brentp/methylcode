@@ -8,12 +8,14 @@ __version__ = "0.2.3"
 
 from pyfasta import Fasta
 import numpy as np
+import bsddb
 import sys
 import os.path as op
 import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
 from cbowtie import _update_conversions
+from fastqindex import FastQIndex, FastQEntry
 import string
 import glob
 import datetime
@@ -96,13 +98,13 @@ def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
     mismatches = opts.mismatches
     cmd = ("%(bowtie_path)s/bowtie --sam --sam-nohead " + \
            "--chunkmbs 1024 -v %(mismatches)d --norc " + \
-           "--best -p %(threads)d %(ref_path)s -r %(reads_c2t)s") % locals()
+           "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
 
     if opts.k > 0: cmd += " -k %i" % opts.k
     if opts.M > 0: cmd += " -M %i" % opts.M
     elif opts.m > 0: cmd += " -m %i" % opts.m
 
-    cmd += " %(sam_out_file)s | tee %(out_dir)s/bowtie.log" % locals()
+    cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
 
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
@@ -115,8 +117,7 @@ def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
 
 
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
-
+def parse_sam(sam_aln_file, direction, chr_lengths, get_records):
 
     for sline in open(sam_aln_file):
         # comment.
@@ -129,7 +130,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
         if line[4] == '0': continue 
         assert line[1] == '0', line
 
-        read_id = int(line[0])
+        read_id = line[0]
         seqid = line[2]
         pos0 = int(line[3]) - 1
         converted_seq = line[9]
@@ -137,8 +138,11 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
         # we want to include the orginal, non converted reads
         # in the output file to view the alignment.
         # read_id is the line in the file.
-        fh_raw_reads.seek((read_id * read_len) + read_id)
-        raw_seq = fh_raw_reads.read(read_len)
+        #fh_raw_reads.seek((read_id * read_len) + read_id)
+        #raw_seq = fh_raw_reads.read(read_len)
+        raw_fastq, converted_fastq = get_records(read_id)
+        read_len = len(converted_seq)
+        raw_seq = raw_fastq.seq
 
         if direction == 'f':
             line[9] = raw_seq
@@ -147,8 +151,10 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
             line[3] = str(pos0 + 1)
             # since the read matched the flipped genome. we flip it here.
             line[9] = raw_seq = revcomp(raw_seq)
+            # flip the quality as well.
+            line[10] = line[10][::-1]
             line[1] = '16' # alignment on reverse strand.
-            converted_seq = revcomp(converted_seq)
+            converted_seq = revcomp(converted_fastq.seq)
 
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
@@ -162,7 +168,7 @@ def parse_sam(sam_aln_file, direction, chr_lengths, fh_raw_reads, read_len):
             nmiss=nmiss,
             read_sequence=converted_seq,
             raw_read=raw_seq,
-        ), line
+        ), line, read_len
 
 def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
     """
@@ -180,18 +186,32 @@ def bin_paths_from_fasta(original_fasta, out_dir='', pattern_only=False):
         return [p.lstrip("/") for p in paths]
     return paths
 
+def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
+    """
+    since we're sharing the same index for the reads and the c2t,
+    we take the header and return each record
+    """
+    fpos = fqidx.get_position(header)
+    fh_raw_reads.seek(fpos)
+    fh_c2t_reads.seek(fpos)
+    return FastQEntry(fh_raw_reads), FastQEntry(fh_c2t_reads)
+
 def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
-                      allowed_mismatches,
-                      read_len):
+                      allowed_mismatches):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     assert direction in 'fr'
     print >>sys.stderr, "tabulating %s methylation for %s" % \
             (direction, original_fasta)
 
+    fqidx = FastQIndex(raw_reads + ".c2t")
     fa = Fasta(original_fasta)
     fh_raw_reads = open(raw_reads, 'r')
     fh_c2t_reads = open(raw_reads + ".c2t", 'r')
+
+    def get_records(header):
+        return get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads)
+
 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
     mode = 'a' if direction == 'r' else 'w'
@@ -220,8 +240,7 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
     skipped = 0
     align_count = 0
     pairs = "CT" if direction == "f" else "GA" # 
-    for p, sam_line in parse_sam(sam_file, direction, chr_lengths, fh_raw_reads,
-                       read_len):
+    for p, sam_line, read_len in parse_sam(sam_file, direction, chr_lengths, get_records):
         # read_id is also the line number from the original file.
         read_id = p['read_id']
         pos0 = p['pos0']
@@ -233,20 +252,21 @@ def count_conversions(original_fasta, direction, sam_file, raw_reads, out_dir,
         genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len])
         DEBUG = False
         if DEBUG:
+            araw, ac2t = get_records(read_id)
             print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0, 
                                                          pos0, read_len)
-            fh_c2t_reads.seek((read_id * read_len) + read_id)
+            #fh_c2t_reads.seek((read_id * read_len) + read_id)
             print >>sys.stderr, "mismatches:", p['nmiss']
             print >>sys.stderr, "ref        :", genomic_ref
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
-                c2t = fh_c2t_reads.read(read_len)
+                c2t = ac2t.seq
                 c2t = revcomp(c2t)
                 assert c2t == p['read_sequence']
 
             else:
                 print >>sys.stderr, "raw_read(f):", raw
-                c2t = fh_c2t_reads.read(read_len)
+                c2t = ac2t.seq
                 assert c2t == p['read_sequence']
             print >>sys.stderr, "c2t        :",  c2t, "\n"
 
@@ -336,21 +356,43 @@ $SAMTOOLS index %(odir)s/methylcoded.bam
 
 def convert_reads_c2t(reads_path):
     """
-    assumes all capitals returns the new path and the read_length.
+    assumes all capitals returns the new path and creates and index.
     """
     c2t = reads_path + ".c2t"
-    if is_up_to_date_b(reads_path, c2t): 
-        rp = open(reads_path)
-        l = len(rp.readline().rstrip())
-        rp.close()
-        return c2t, l
+    idx = c2t + FastQIndex.ext
+
+    if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx): 
+        return c2t, FastQIndex(c2t)
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
-    out = open(c2t, 'wb')
-    for line in open(reads_path):
-        assert line.strip(), ("nothing in line from:", reads_path)
-        out.write(line.replace('C', 'T'))
-    out.close()
-    return c2t, len(line.rstrip())
+
+    try:
+        out = open(c2t, 'wb')
+        db = bsddb.btopen(idx, 'n', cachesize=32768*2, pgsize=512)
+
+        fh_fq = open(reads_path)
+        tell = fh_fq.tell
+        next_line = fh_fq.readline
+        while True:
+            pos = tell()
+            header = next_line().rstrip()
+            if not header: break
+            db[header[1:]] = str(pos)
+            seq = next_line()
+
+            out.write(header + '\n')
+            out.write(seq.replace('C', 'T'))
+            out.write(next_line())
+            out.write(next_line())
+        out.close()
+        print >>sys.stderr, "opening index"
+        db.close()
+    except:
+        os.unlink(c2t)
+        os.unlink(idx)
+        raise
+    return c2t, FastQIndex(c2t)
+
+
 
 def make_header():
     return """\
@@ -359,26 +401,6 @@ def make_header():
 #from: %s
 #version: %s""" % (" ".join(sys.argv), datetime.date.today(), 
                    op.abspath("."), __version__)
-
-def fastq_to_raw(fastq):
-    assert op.exists(fastq), "make sure %s is correct path" % fastq
-    outf = fastq + ".raw"
-    if not is_up_to_date_b(fastq, outf):
-        out = open(outf, "w")
-        with open(fastq) as fh:
-            while True:
-                if not fh.readline(): break # header
-                line = fh.readline() # seq
-                fh.readline()
-                fh.readline()
-                assert not '@' in line
-                out.write(line)
-        out.close()
-        print >>sys.stderr, "wrote raw reads to '%s'" % (out.name)
-    else:
-        print >>sys.stderr, "using raw reads at '%s'" % (outf)
-    return outf
-
 
 if __name__ == "__main__":
     import optparse
@@ -391,8 +413,8 @@ if __name__ == "__main__":
 
     p.add_option("--mismatches", dest="mismatches", default=2, type="int",
              help="number of mismatches allowed. sent to bowtie executable")
-    p.add_option("--fasta", dest="fasta",
-             help="path to fasta file to which to align reads")
+    p.add_option("--reference", dest="reference",
+             help="path to reference fasta file to which to align reads")
     p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=1)
     p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=-1)
     p.add_option("-M", dest="M", type='int', help="bowtie's -M parameter", default=-1)
@@ -402,7 +424,7 @@ if __name__ == "__main__":
     if not (opts.reads and opts.bowtie):
         sys.exit(p.print_help())
 
-    fasta = opts.fasta
+    fasta = opts.reference
     if fasta is None:
         assert len(args) == 1, "must specify path to fasta file"
         fasta = args[0]
@@ -418,8 +440,8 @@ if __name__ == "__main__":
     if preverse is not None: preverse.wait()
     if pforward is not None: pforward.wait()
 
-    raw_reads = fastq_to_raw(opts.reads)
-    c2t_reads, read_len = convert_reads_c2t(raw_reads)  
+    raw_reads = opts.reads
+    c2t_reads, c2t_index = convert_reads_c2t(raw_reads)  
     ref_forward = op.splitext(fforward_c2t)[0]
     ref_reverse = op.splitext(freverse_c2t)[0]
     try:
@@ -430,13 +452,11 @@ if __name__ == "__main__":
         reverse_sam, rprocess = run_bowtie(opts, ref_reverse, c2t_reads)
         # start tabulating forward results.
         count_conversions(fasta, 'f', forward_sam, raw_reads, opts.out_dir,
-                          opts.mismatches,
-                          read_len)
+                          opts.mismatches)
         # then wait for reverse process to finished. before tabulating.
         rprocess and rprocess.wait()
         count_conversions(fasta, 'r', reverse_sam, raw_reads, opts.out_dir,
-                      opts.mismatches,
-                      read_len)
+                      opts.mismatches)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
