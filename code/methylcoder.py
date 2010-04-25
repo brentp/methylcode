@@ -1,7 +1,6 @@
 """
-write the forward and reverse mappings for use by bowtie.
-the code in this file originally benefited from a read of the
-methodology in bsseeker.
+generate methylation data given a reference genome and a set of bisulfite
+treated reads.
 """
 
 __version__ = "0.2.5"
@@ -35,7 +34,7 @@ except ImportError:
 
 def write_c2t(fasta_name):
     """
-    given a fasta file, write a new: 
+    given a fasta file, write a new file:
         `some.fr.c2t.fasta` which contains:
           + the same headers prefixed with 'f' with all C's converted to T
           + headers prefixed with 'r' reverse complemented with
@@ -88,12 +87,16 @@ def run_bowtie_builder(bowtie_path, fasta_path):
     process = Popen(cmd, shell=True)
     process.wait()
 
-def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
+def is_same_cmd(cmd, prev_file):
+    return op.exists(prev_file) and \
+        cmd.strip() == open(prev_file).read().strip()
+
+def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, threads=CPU_COUNT):
     out_dir = opts.out_dir
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
     mismatches = opts.mismatches
-    cmd = ("%(bowtie_path)s/bowtie --sam --sam-nohead " + \
+    cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --sam --sam-nohead " + \
            "--chunkmbs 1024 -v %(mismatches)d --norc " + \
            "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
 
@@ -105,11 +108,14 @@ def run_bowtie(opts, ref_path, reads_c2t, threads=CPU_COUNT, **kwargs):
     print >>sys.stderr, cmd.replace("//", "/")
 
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
-       is_up_to_date_b(reads_c2t, sam_out_file):
+       is_up_to_date_b(reads_c2t, sam_out_file) and \
+       is_same_cmd(cmd, sam_out_file + ".bowtie.sh"):
+
         print >>sys.stderr, "^ up to date, not running ^"
         return sam_out_file
 
     process = Popen(cmd, shell=True)
+    print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
     process.wait()
     return sam_out_file
 
@@ -297,26 +303,34 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
     print >>out, make_header()
     print >>out, "#seqid\tmt\tbp\tc\tt"
 
+    f_pat = bin_paths_from_fasta(original_fasta, out_dir, pattern_only=True)
+    print >>sys.stderr, "#> writing:", f_pat
+
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
         ts = counts[seqid]['t']
         csum = float(cs.sum())
         tsum = float(ts.sum())
         mask = (cs + ts) > 0
-        meth = (cs[mask].astype('f') / (cs[mask] + ts[mask]))
-        print >>sys.stderr, "chr: %s, cs: %i, ts: %i, methylation: %.4f" \
-                % (seqid, csum, tsum, meth.mean())
 
         cs.tofile(fc % seqid)
         ts.tofile(ft % seqid)
 
-        file_pat = bin_paths_from_fasta(original_fasta, out_dir, 
-                                        pattern_only=True)
 
-        print >>sys.stderr, "#> writing:", file_pat % seqid
 
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
+
+        # print a quick summary of methylation for each context.
+        summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]"  % (seqid, csum, tsum)
+        contexts = [('CG', (1, 4)), ('CHG', (2, 5)), ('CHH', (3, 6))]
+        for context, (mp, mm) in contexts:
+            ctx = (mtype == mp) | (mtype == mm)
+            ctx_mask = mask & ctx
+            meth = (cs[ctx_mask].astype('f') / (cs[ctx_mask] + ts[ctx_mask]))
+            summary += (" %s: %.4f" % (context, meth.mean()))
+        print >>sys.stderr, summary.rstrip(",")
+
         mtype.tofile(fmethyltype % seqid)
         to_text_file(cs, ts, mtype, seqid, out)
 
@@ -406,6 +420,11 @@ if __name__ == "__main__":
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
 
+    p.add_option("--bowtie_args", dest="bowtie_args", default="",
+                 help="any extra arguments to pass directly to bowtie. must "
+                 " be specified inside a string. e.g.: " 
+                 "--bowtie_args '--strata --solexa-quals'")
+
     p.add_option("--mismatches", dest="mismatches", default=2, type="int",
              help="number of mismatches allowed. sent to bowtie executable")
     p.add_option("--reference", dest="reference",
@@ -437,7 +456,7 @@ if __name__ == "__main__":
     ref_base = op.splitext(fr_c2t)[0]
     try:
 
-        sam = run_bowtie(opts, ref_base, c2t_reads)
+        sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args)
         count_conversions(fasta, sam, raw_reads, opts.out_dir, opts.mismatches)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)

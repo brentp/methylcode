@@ -3,6 +3,21 @@ MethylCode
 
 Python code and shell scripts for fast, simple processing of BiSulfite reads
 into methylation data. Also includes scripts for analysis and visualization.
+In addition to a binary output, the direct output of methylcode is a text file
+that looks like ::
+
+    #seqid  mt  bp  c   t
+    1   3   1354    0   1
+    1   3   1358    0   1
+    1   3   1393    0   1
+    1   3   1394    0   1
+    1   3   1402    0   1
+    1   3   1409    0   1
+
+where columns are reference `seqid` methylation context (type) basepair 
+location(bp) number of reads where a (c)ytosine was unconverted, number 
+of reads where where a cytosine was converted to (t)hymine. Making methylation
+at every methylable basepair easily calculated as c / (c + t).
 
 .. contents ::
 
@@ -21,7 +36,6 @@ all of these are available from pypi and as such are installable via
 * `numpy`_ to handle arrays and binary data in python
 * `pyfasta`_ to access/index fasta files
 * `cython`_ fast c-extensions for python
-* (optional) `h5py`_ organizing the output
 
 C
 -
@@ -43,7 +57,7 @@ Input
 =====
 The input to the pipeline is:
 
-* a genomic fasta file with one entry per chromosome in the genome to which
+* a reference fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped. 
 * a fastq reads file. all reads must be the same length and must be from 
   Eckers/Zilberman bisulfite process
@@ -97,45 +111,28 @@ An example command to run the pipeline is::
                            --bowtie=/usr/local/src/bowtie/ \
                             --reads /path/to/reads.fastq \
                             --outdir out/   \
-                            /path/to/thaliana_v9.fasta 
+                            --reference /path/to/thaliana_v9.fasta 
 
 Where you must adjust `/path/to/` to the appropriate paths and `outdir` must exist.
 This will create the files specified in `Output`_ above, sending the text to 
 `out/methy-data-DATE.txt` where DATE is the current date. The binary files will
 be sent to, for example: `out/thaliana_v9.fasta.[CHR].methyl.bin` where [CHR] is 
 substituted by each chromosome in the fasta file. Once bowtie is run once,
-it's output is not deleted, and methylcoder.py will only re-run bowtie if its
+its output is not deleted, and methylcoder.py will only re-run bowtie if its
 input has been modified since it was run last. *NOTE* if the `methylcoder.py`
-script is called without any options, it will print help and its available
-commandline arguments.
+script is called without any options, it will print help and available
+command-line arguments.
+Additional args can be sent directly to bowtie as a string to methylcoder.py's
+--bowtie_args parameter. This would look like. ::
 
-Given that output, one can then do a sanity check on the output by running::
+    --bowtie_args "--solexa-quals -k 1 -m 1"
 
-    $ python sanity_check.py -b -f thaliana_v8.fasta r/thaliana_v8.1.methyl.bin
-
-to check the binary file in the directory '/r' was specified when calling
-methylcoder.py above. For a text file, the command is::
-
-    $ python sanity_check.py -t -f thaliana_v8.fasta r/methyl-data-DATE.txt
-
-Because that is reading a text file, it will take a couple minutes, but it 
-should *never* fail. Once it's certain that the output is sane, one can create
-a moving-window average of the methylation data using the moving_window.py
-script. For each input .methyl.bin file, it will create 3 output files, 1 for
-each methylation type. So, for the 5 arabidopsis chromosomes, to generate the
-15 total moving windows for a window-size of 100, run as::
-
-   $ python python moving_window.py -w 100 r/thaliana_v8.*.methyl.bin
-
-the output files for chromosome 5 will look like:
-   * r/thaliana_v8.5.CG.w100.bin
-   * r/thaliana_v8.5.CHG.w100.bin
-   * r/thaliana_v8.5.CHH.w100.bin
-
-these are written as 32 bit floats.
+and that string will be passed directly to the bowtie invocation when it is
+called from methylcoder.
 
 
 Analysis/Visualization
+
 ======================
 
 See: http://github.com/brentp/methylcode/wikis/using-samtools-to-view-alignments
