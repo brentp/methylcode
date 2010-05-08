@@ -101,7 +101,6 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, threads=CPU_COUNT):
            "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
 
     if opts.k > 0: cmd += " -k %i" % opts.k
-    if opts.M > 0: cmd += " -M %i" % opts.M
     elif opts.m > 0: cmd += " -m %i" % opts.m
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
@@ -129,9 +128,9 @@ def parse_sam(sam_aln_file, chr_lengths, get_records):
         # it was excluded because of -M
         line = sline.split("\t")
         # no reported alignments.
-        if line[1] == '4': continue 
+        if line[1] == '4': continue
         # extra found via -M
-        if line[4] == '0': continue 
+        if line[4] == '0': continue
         assert line[1] == '0', line
 
         read_id = line[0]
@@ -205,7 +204,7 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
     fh_raw_reads.seek(fpos)
     fh_c2t_reads.seek(fpos)
     return FastQEntry(fh_raw_reads), FastQEntry(fh_c2t_reads)
-   
+
 def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
                       allowed_mismatches):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
@@ -224,7 +223,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
     out_sam = open(out_dir + "/methylcoded.sam", 'w')
- 
+
     # get the 3 possible binary files for each chr
     fc, ft, fmethyltype = \
             bin_paths_from_fasta(original_fasta, out_dir)
@@ -236,7 +235,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
         counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
-                     # total reads in which this c changed to t 
+                     # total reads in which this c changed to t
                      'c': np.zeros((len(fa[k]),), dtype=np.uint32)}
         assert len(fa[k]) == len(counts[k]['t']) == len(counts[k]['c'])
 
@@ -244,7 +243,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
     align_count = 0
     for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths, get_records):
         # read_id is also the line number from the original file.
-        pairs = "CT" if direction == "f" else "GA" # 
+        pairs = "CT" if direction == "f" else "GA" #
         read_id = p['read_id']
         pos0 = p['pos0']
         align_count += 1
@@ -256,7 +255,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
         DEBUG = False
         if DEBUG:
             araw, ac2t = get_records(read_id)
-            print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0, 
+            print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0,
                                                          pos0, read_len)
             #fh_c2t_reads.seek((read_id * read_len) + read_id)
             print >>sys.stderr, "mismatches:", p['nmiss']
@@ -283,7 +282,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
         # allowed mismatches, we dont include the stats for this read.
         remaining_mismatches = allowed_mismatches - current_mismatches
         this_skipped = _update_conversions(genomic_ref, raw, pos0, pairs,
-                                       counts[p['seqid']]['c'], 
+                                       counts[p['seqid']]['c'],
                                        counts[p['seqid']]['t'],
                                       remaining_mismatches, read_len)
         if this_skipped == 0:
@@ -370,7 +369,7 @@ def convert_reads_c2t(reads_path):
     c2t = reads_path + ".c2t"
     idx = c2t + FastQIndex.ext
 
-    if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx): 
+    if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx):
         return c2t, FastQIndex(c2t)
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
 
@@ -385,9 +384,9 @@ def convert_reads_c2t(reads_path):
             pos = tell()
             header = next_line().rstrip()
             if not header: break
+
             db[header[1:]] = str(pos)
             seq = next_line()
-
             out.write(header + '\n')
             out.write(seq.replace('C', 'T'))
             out.write(next_line())
@@ -401,6 +400,18 @@ def convert_reads_c2t(reads_path):
         raise
     return c2t, FastQIndex(c2t)
 
+def get_fasta(opts, args):
+    "all the stuff to get the fasta from cmd line in single spot"
+    fasta = opts.reference
+    if fasta is None:
+        assert len(args) == 1, "must specify path to fasta file"
+        fasta = args[0]
+        assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
+    if glob.glob("%s/*.bin" % opts.out_dir):
+        print >>sys.stderr, "PLEASE use an empty out directory or move "\
+                "the existing .bin files from %s" % opts.out_dir
+        sys.exit(1)
+    return fasta
 
 
 def make_header():
@@ -408,7 +419,7 @@ def make_header():
 #created by: %s
 #on: %s
 #from: %s
-#version: %s""" % (" ".join(sys.argv), datetime.date.today(), 
+#version: %s""" % (" ".join(sys.argv), datetime.date.today(),
                    op.abspath("."), __version__)
 
 if __name__ == "__main__":
@@ -422,37 +433,27 @@ if __name__ == "__main__":
 
     p.add_option("--bowtie_args", dest="bowtie_args", default="",
                  help="any extra arguments to pass directly to bowtie. must "
-                 " be specified inside a string. e.g.: " 
+                 " be specified inside a string. e.g.: "
                  "--bowtie_args '--strata --solexa-quals'")
 
-    p.add_option("--mismatches", dest="mismatches", default=2, type="int",
+    p.add_option("-v", "--mismatches", dest="mismatches", default=2, type="int",
              help="number of mismatches allowed. sent to bowtie executable")
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
     p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=1)
     p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=-1)
-    p.add_option("-M", dest="M", type='int', help="bowtie's -M parameter", default=-1)
 
     opts, args = p.parse_args()
 
     if not (opts.reads and opts.bowtie):
         sys.exit(p.print_help())
 
-    fasta = opts.reference
-    if fasta is None:
-        assert len(args) == 1, "must specify path to fasta file"
-        fasta = args[0]
-        assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
-    if glob.glob("%s/*.bin" % opts.out_dir):
-        print >>sys.stderr, "PLEASE use an empty out directory or move "\
-                "the existing .bin files from %s" % opts.out_dir
-        sys.exit(1)
-
+    fasta = get_fasta(opts, args)
     fr_c2t = write_c2t(fasta)
     run_bowtie_builder(opts.bowtie, fr_c2t)
 
     raw_reads = opts.reads
-    c2t_reads, c2t_index = convert_reads_c2t(raw_reads)  
+    c2t_reads, c2t_index = convert_reads_c2t(raw_reads)
     ref_base = op.splitext(fr_c2t)[0]
     try:
 
