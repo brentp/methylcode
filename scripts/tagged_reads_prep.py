@@ -40,7 +40,7 @@ def main(reads, tags, fmt):
             else:
                 print >>sys.stderr, "warning:%s does not start with specified tags!"
             record[1] = seq
-            record[3] = record[3][-len(seq):] # strip the stuff for tags.
+            record[3] = record[3][-len(seq):][::-1] # strip the stuff for tags.
         print "\n".join(record)
 
 if __name__ == "__main__":
