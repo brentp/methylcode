@@ -78,7 +78,7 @@ def is_up_to_date_b(a, b):
 def run_bowtie_builder(bowtie_path, fasta_path):
     d = os.path.dirname(fasta_path)
     p, ext = op.splitext(op.basename(fasta_path)) # some.fasta -> some, fasta
-    cmd = '%s/bowtie-build -f %s %s/%s | tee %s/%s.bowtie-build.log' % \
+    cmd = '%s/bowtie-build -q -f %s %s/%s > %s/%s.bowtie-build.log' % \
                 (bowtie_path, fasta_path, d, p, d, p)
 
     if is_up_to_date_b(fasta_path, "%s/%s.1.ebwt" % (d, p)):
@@ -305,6 +305,10 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
     f_pat = bin_paths_from_fasta(original_fasta, out_dir, pattern_only=True)
     print >>sys.stderr, "#> writing:", f_pat
 
+    summary_counts = dict.fromkeys(('CHG', 'CHH', 'CG'))
+    for ctx in summary_counts.keys():
+        summary_counts[ctx] = {'cs': 0, 'ts': 0}
+
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
         ts = counts[seqid]['t']
@@ -316,16 +320,18 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
         ts.tofile(ft % seqid)
 
 
-
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
 
         # print a quick summary of methylation for each context.
-        summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]"  % (seqid, csum, tsum)
+        summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]" \
+                  % (seqid, csum, tsum)
         contexts = [('CG', (1, 4)), ('CHG', (2, 5)), ('CHH', (3, 6))]
         for context, (mp, mm) in contexts:
             ctx = (mtype == mp) | (mtype == mm)
             ctx_mask = mask & ctx
+            summary_counts[context]['cs'] += cs[ctx_mask].sum()
+            summary_counts[context]['ts'] += ts[ctx_mask].sum()
             meth = (cs[ctx_mask].astype('f') / (cs[ctx_mask] + ts[ctx_mask]))
             summary += (" %s: %.4f" % (context, meth.mean()))
         print >>sys.stderr, summary.rstrip(",")
@@ -333,6 +339,11 @@ def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
         mtype.tofile(fmethyltype % seqid)
         to_text_file(cs, ts, mtype, seqid, out)
 
+    print >>sys.stderr, "genome-wide: methylation (cs, ts)"
+    for ctx in sorted(summary_counts.keys()):
+        d = summary_counts[ctx]
+        print >>sys.stderr, "%s: %.5f (%i %i)" % \
+                (ctx, d['cs'] / float(d['cs'] + d['ts']), d['cs'], d['ts'])
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     """
