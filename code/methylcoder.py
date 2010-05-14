@@ -101,7 +101,7 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, threads=CPU_COUNT):
            "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
 
     if opts.k > 0: cmd += " -k %i" % opts.k
-    elif opts.m > 0: cmd += " -m %i" % opts.m
+    if opts.m > 0: cmd += " -m %i" % opts.m
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
