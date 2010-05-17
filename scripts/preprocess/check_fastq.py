@@ -11,9 +11,9 @@ fh = open(sys.argv[1])
 rl = fh.readline
 while True:
     header = rl().strip()
-    if not header: continue
-    assert header[0] == "@", (header)
+    if not header: break
+    assert header[0] == "@", (header, )
     seq = rl()
-    assert rl()[0] == "+"
+    assert rl()[0] == "+", (header, )
     qual = rl()
     assert len(seq) == len(qual), (header, seq, qual)
