@@ -8,7 +8,7 @@ check a fastq file for validity checks are:
 import sys
 
 fh = open(sys.argv[1])
-rl = fh.readline()
+rl = fh.readline
 while True:
     header = rl().strip()
     if not header: continue
