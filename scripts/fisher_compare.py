@@ -1,9 +1,15 @@
+"""
+compare 2 sets of data that have been run through the methylcode pipeline.
+usage:
+
+    % prog [options] dir_a/ dir_b/
+
+"""
 from fisher import pvalue
 import sys
 import os.path as op
 sys.path.insert(0, op.join(op.dirname(__file__), "../code"))
 from methyl import MethylGroup
-import numpy as np
 from flatfeature import Flat
 
 def bin_setup(chr, adir, bdir, context):
@@ -11,8 +17,9 @@ def bin_setup(chr, adir, bdir, context):
     bm = MethylGroup(bdir)[chr]
     return am.as_context(context), bm.as_context(context)
 
-def run_50bp_gff(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_range):
-    fh = open('fisher.different.%s.%ibp.gff' % (context, window), 'w')
+def run_compare(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_range):
+    #fh = open('fisher.different.%s.%ibp.gff' % (context, window), 'w')
+    fh = sys.stdout
     print >>sys.stderr, "writing to:", fh.name
     print >>fh, "##gff-version 3"
     for chr in flat.seqids:
@@ -92,6 +99,6 @@ if __name__ == "__main__":
     if opts.ratio_range:
         rr = map(float, opts.ratio_range.split(":"))
 
-    run_50bp_gff(f, dir_a, dir_b, opts.context, opts.window, opts.binary,
+    run_compare(f, dir_a, dir_b, opts.context, opts.window, opts.binary,
                 opts.pvalue, rr)
 
