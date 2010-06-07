@@ -21,6 +21,16 @@ at every methylable basepair easily calculated as c / (c + t).
 
 .. contents ::
 
+About
+=====
+
+This software is distributed under the BSD License and possible because of
+the `Fischer Lab`_ . Please report any bugs, patches, problems, docs to
+bpederse@gmail.com
+
+It is distributed under the `New BSD License <http://github.com/brentp/methylcode/blob/master/LICENSE>`_
+
+
 Requirements
 ============
 
@@ -162,3 +172,4 @@ does not do so currently)
 .. _`h5py`: http://pypi.python.org/pypi/h5py/
 .. _`bowtie`: http://bowtie-bio.sourceforge.net/index.shtml
 .. _`sam-tools`: http://samtools.sourceforge.net/
+.. _`Fischer Lab`: http://epmb.berkeley.edu/facPage/dispFP.php?I=8
