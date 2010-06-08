@@ -1,9 +1,9 @@
-MethylCode
-==========
+MethylCoder
+===========
 
 Python code and shell scripts for fast, simple processing of BiSulfite reads
 into methylation data. Also includes scripts for analysis and visualization.
-In addition to a binary output, the direct output of methylcode is a text file
+In addition to a binary output, the direct output of methylcoder is a text file
 that looks like ::
 
     #seqid  mt  bp  c   t
