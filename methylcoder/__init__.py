@@ -433,7 +433,7 @@ def make_header():
 #version: %s""" % (" ".join(sys.argv), datetime.date.today(),
                    op.abspath("."), __version__)
 
-if __name__ == "__main__":
+def main():
     import optparse
     p = optparse.OptionParser(__doc__)
 
@@ -486,3 +486,6 @@ if __name__ == "__main__":
         write_sam_commands(opts.out_dir, Fasta(fasta))
 
     print >>sys.stderr, "SUCCESS"
+
+if __name__ == "__main__":
+    main()
