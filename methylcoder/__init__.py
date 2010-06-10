@@ -424,6 +424,11 @@ def get_fasta(opts, args):
         sys.exit(1)
     return fasta
 
+def get_out_dir(out_dir, reads):
+    out_dir = out_dir or op.join(op.dirname(reads), "out")
+    if not op.exists(out_dir):
+        os.makedirs(out_dir)
+    return out_dir
 
 def make_header():
     return """\
@@ -459,13 +464,17 @@ def main():
     if not (opts.reads and opts.bowtie):
         sys.exit(p.print_help())
 
+    out_dir = opts.out_dir = get_out_dir(opts.out_dir, opts.reads)
     fasta = get_fasta(opts, args)
     fr_c2t = write_c2t(fasta)
+
+
     run_bowtie_builder(opts.bowtie, fr_c2t)
 
     raw_reads = opts.reads
     c2t_reads, c2t_index = convert_reads_c2t(raw_reads)
     ref_base = op.splitext(fr_c2t)[0]
+
     try:
 
         sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args)

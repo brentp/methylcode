@@ -5,20 +5,21 @@ import numpy as np
 import os.path as op
 import sys
 sys.path.insert(0, op.dirname(__file__))
-import methylcoder
+
+#import methylcoder
 
 ext_modules = [ Extension("methylcoder/cbowtie",
-                sources=["methylcoder/cbowtie.c"], 
-                include_dirs=[np.get_include(), "methylcode"]) ]
+                sources=["methylcoder/cbowtie.c"],
+                include_dirs=[np.get_include(), "methylcoder"]) ]
 
 setup(
     license="BSD",
     name = "methylcoder",
-    version = methylcoder.__version__,
+    #version = methylcoder.__version__,
     ext_modules = ext_modules,
     packages=['methylcoder'],
     zip_safe=False,
-    install_requires=['numpy', 'pyfasta'],
+    requires=['numpy', 'pyfasta'],
     entry_points = {
         'console_scripts': ['methylcoder = methylcoder:main']
     }
