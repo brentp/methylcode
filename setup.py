@@ -2,7 +2,10 @@ from setuptools import setup
 from distutils.extension import Extension
 import numpy as np
 
-#import methylcoder
+import os.path as op
+import sys
+sys.path.insert(0, op.dirname(__file__))
+import methylcoder
 
 ext_modules = [ Extension("methylcoder/cbowtie",
                 sources=["methylcoder/cbowtie.c"], 
@@ -11,7 +14,7 @@ ext_modules = [ Extension("methylcoder/cbowtie",
 setup(
     license="BSD",
     name = "methylcoder",
-    #version = methylcoder.__version__,
+    version = methylcoder.__version__,
     ext_modules = ext_modules,
     packages=['methylcoder'],
     zip_safe=False,
