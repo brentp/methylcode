@@ -95,13 +95,13 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, threads=CPU_COUNT):
     out_dir = opts.out_dir
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
-    mismatches = opts.mismatches
     cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --sam --sam-nohead " + \
-           "--chunkmbs 1024 -v %(mismatches)d --norc " + \
+           "--chunkmbs 1024 --norc " + \
            "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
 
-    if opts.k > 0: cmd += " -k %i" % opts.k
-    if opts.m > 0: cmd += " -m %i" % opts.m
+    if opts.k is not None: cmd += " -k %i" % opts.k
+    if opts.m is not None: cmd += " -m %i" % opts.m
+    if opts.mismatches: cmd += " -v  %i" % opts.mismatches
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
@@ -447,12 +447,12 @@ def main():
                  " be specified inside a string. e.g.: "
                  "--bowtie_args '--strata --solexa-quals'")
 
-    p.add_option("-v", "--mismatches", dest="mismatches", default=2, type="int",
+    p.add_option("-v", "--mismatches", dest="mismatches", type="int",
              help="number of mismatches allowed. sent to bowtie executable")
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
-    p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=1)
-    p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=-1)
+    p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=None)
+    p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=None)
 
     opts, args = p.parse_args()
 
@@ -469,7 +469,9 @@ def main():
     try:
 
         sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args)
-        count_conversions(fasta, sam, raw_reads, opts.out_dir, opts.mismatches)
+        # if they didn't specify mismatches (used quality scores, then allow 2 more
+        # from c2t coversions.
+        count_conversions(fasta, sam, raw_reads, opts.out_dir, opts.mismatches or 2)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):

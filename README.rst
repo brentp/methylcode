@@ -1,9 +1,9 @@
-MethylCode
-==========
+MethylCoder
+===========
 
 Python code and shell scripts for fast, simple processing of BiSulfite reads
 into methylation data. Also includes scripts for analysis and visualization.
-In addition to a binary output, the direct output of methylcode is a text file
+In addition to a binary output, the direct output of methylcoder is a text file
 that looks like ::
 
     #seqid  mt  bp  c   t
@@ -20,6 +20,16 @@ of reads where where a cytosine was converted to (t)hymine. Making methylation
 at every methylable basepair easily calculated as c / (c + t).
 
 .. contents ::
+
+About
+=====
+
+This software is distributed under the BSD License and possible because of
+the `Fischer Lab`_ . Please report any bugs, patches, problems, docs to
+bpederse@gmail.com
+
+It is distributed under the `New BSD License <http://github.com/brentp/methylcode/blob/master/LICENSE>`_
+
 
 Requirements
 ============
@@ -45,7 +55,7 @@ Installation
 ------------
 once the above python and c libraries are installed, it is still necessary to
 run ::
-    
+
     $ sudo python setup.py install
 
 to install the package into your path. After that, the executable 'methylcoder'
@@ -123,7 +133,7 @@ command-line arguments.
 Additional args can be sent directly to bowtie as a string to methylcoder.py's
 --bowtie_args parameter. This would look like. ::
 
-    --bowtie_args "--solexa-quals -k 1 -m 1"
+    --bowtie_args "--solexa-quals -k 1 -m 1 --strata"
 
 and that string will be passed directly to the bowtie invocation when it is
 called from methylcoder.
@@ -160,3 +170,4 @@ does not do so currently)
 .. _`h5py`: http://pypi.python.org/pypi/h5py/
 .. _`bowtie`: http://bowtie-bio.sourceforge.net/index.shtml
 .. _`sam-tools`: http://samtools.sourceforge.net/
+.. _`Fischer Lab`: http://epmb.berkeley.edu/facPage/dispFP.php?I=8
