@@ -56,6 +56,7 @@ class FastQIndex(object):
     def is_current(self):
         return is_up_to_date_b(self.filename, self.filename + self.ext)
 
+    @classmethod
     def create(cls, filename, get_next_pos):
         fh = open(filename)
         lines = sum(1 for line in fh)
@@ -77,11 +78,10 @@ class FastQIndex(object):
         self.fh = open(self.filename)
         if not self.is_current():
             try:
-                FastQIndex.create(self.filename, self.entry_class.get_next_position)
+                self.create(self.filename, self.entry_class.get_next_position)
             except:
                 os.unlink(self.filename + self.ext)
                 raise
-
         self.db = bsddb.btopen(filename + self.ext, 'r')
 
     def __getitem__(self, key):
@@ -89,7 +89,7 @@ class FastQIndex(object):
         pos = self.db.get(key, None)
         if pos is None: raise KeyError(key)
         self.fh.seek(long(pos))
-        return self.call_class(self.fh)
+        return self.entry_class(self.fh)
 
     def get_position(self, key):
         return long(self.db.get(key, None))
@@ -102,6 +102,10 @@ class FastQIndex(object):
 
     def iterkeys(self):
         return self.db.iterkeys()
+
+    def __contains__(self, key):
+        return key in self.db
+    contains = __contains__
 
 class FastaIndex(FastQIndex):
     ext = '.fadx'
