@@ -425,9 +425,10 @@ def get_fasta(opts, args):
     return fasta
 
 def get_out_dir(out_dir, reads):
-    out_dir = out_dir or op.join(op.dirname(reads), "out")
+    out_dir = out_dir or op.splitext(reads)[0] + "_methylcoder"
     if not op.exists(out_dir):
         os.makedirs(out_dir)
+    print >>sys.stderr, "using %s for writing output" % out_dir
     return out_dir
 
 def make_header():
