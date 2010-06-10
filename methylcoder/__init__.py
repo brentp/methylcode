@@ -14,7 +14,7 @@ import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
 from cbowtie import _update_conversions
-from fastqindex import FastQIndex, FastQEntry
+from fastqindex import guess_index_class
 import string
 import glob
 import datetime
@@ -91,17 +91,18 @@ def is_same_cmd(cmd, prev_file):
     return op.exists(prev_file) and \
         cmd.strip() == open(prev_file).read().strip()
 
-def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, threads=CPU_COUNT):
+def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, bowtie_sequence_flag,
+               threads=CPU_COUNT):
     out_dir = opts.out_dir
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
     cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --sam --sam-nohead " + \
-           "--chunkmbs 1024 --norc " + \
-           "--best -p %(threads)d %(ref_path)s -q %(reads_c2t)s") % locals()
+           "--chunkmbs 1024 --norc --best -p %(threads)d %(ref_path)s " + \
+           "-%(bowtie_sequence_flag)s %(reads_c2t)s") % locals()
 
     if opts.k is not None: cmd += " -k %i" % opts.k
     if opts.m is not None: cmd += " -m %i" % opts.m
-    if opts.mismatches: cmd += " -v  %i" % opts.mismatches
+    if opts.mismatches >= 0: cmd += " -v  %i" % opts.mismatches
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
@@ -200,18 +201,19 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
     since we're sharing the same index for the reads and the c2t,
     we take the header and return each record
     """
+    IndexEntry = fqidx.entry_class
     fpos = fqidx.get_position(header)
     fh_raw_reads.seek(fpos)
     fh_c2t_reads.seek(fpos)
-    return FastQEntry(fh_raw_reads), FastQEntry(fh_c2t_reads)
+    return IndexEntry(fh_raw_reads), IndexEntry(fh_c2t_reads)
 
-def count_conversions(original_fasta, sam_file, raw_reads, out_dir,
+def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
                       allowed_mismatches):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
 
-    fqidx = FastQIndex(raw_reads + ".c2t")
+    fqidx = index_class(raw_reads + ".c2t")
     fa = Fasta(original_fasta)
     fh_raw_reads = open(raw_reads, 'r')
     fh_c2t_reads = open(raw_reads + ".c2t", 'r')
@@ -377,11 +379,13 @@ def convert_reads_c2t(reads_path):
     """
     assumes all capitals returns the new path and creates and index.
     """
+
+    IndexClass = guess_index_class(reads_path)
     c2t = reads_path + ".c2t"
-    idx = c2t + FastQIndex.ext
+    idx = c2t + IndexClass.ext
 
     if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx):
-        return c2t, FastQIndex(c2t)
+        return c2t, IndexClass(c2t)
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
 
     try:
@@ -391,17 +395,19 @@ def convert_reads_c2t(reads_path):
         fh_fq = open(reads_path)
         tell = fh_fq.tell
         next_line = fh_fq.readline
+        lines = range(2, IndexClass.entry_class.lines)
+
         while True:
             pos = tell()
-            header = next_line().rstrip()
+            header = next_line().rstrip('\n')
             if not header: break
 
             db[header[1:]] = str(pos)
             seq = next_line()
             out.write(header + '\n')
             out.write(seq.replace('C', 'T'))
-            out.write(next_line())
-            out.write(next_line())
+            for i in lines: out.write(next_line())
+
         out.close()
         print >>sys.stderr, "opening index"
         db.close()
@@ -409,7 +415,7 @@ def convert_reads_c2t(reads_path):
         os.unlink(c2t)
         os.unlink(idx)
         raise
-    return c2t, FastQIndex(c2t)
+    return c2t, IndexClass(c2t)
 
 def get_fasta(opts, args):
     "all the stuff to get the fasta from cmd line in single spot"
@@ -453,7 +459,7 @@ def main():
                  " be specified inside a string. e.g.: "
                  "--bowtie_args '--strata --solexa-quals'")
 
-    p.add_option("-v", "--mismatches", dest="mismatches", type="int",
+    p.add_option("-v", "--mismatches", dest="mismatches", type="int", default=0,
              help="number of mismatches allowed. sent to bowtie executable")
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
@@ -477,11 +483,10 @@ def main():
     ref_base = op.splitext(fr_c2t)[0]
 
     try:
-
-        sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args)
-        # if they didn't specify mismatches (used quality scores, then allow 2 more
-        # from c2t coversions.
-        count_conversions(fasta, sam, raw_reads, opts.out_dir, opts.mismatches or 2)
+        IndexClass = c2t_index.__class__
+        bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
+        sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args, bowtie_reads_flag)
+        count_conversions(fasta, sam, raw_reads, IndexClass, opts.out_dir, opts.mismatches)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
