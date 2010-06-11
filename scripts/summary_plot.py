@@ -7,6 +7,8 @@ where dir1/ and dir2/ contain the .bin files from a run of methylcoder.
 as many directories as you want.
 """
 import matplotlib
+matplotlib.rc('axes', edgecolor='#aaaaaa', linewidth=0.9)
+matplotlib.rc('font', family='sans-serif')
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import sys
@@ -82,8 +84,8 @@ def plot(names, labels, opts):
 
     plt.xticks(xs - 0.66 * width  - (width + spacing) * i/2., xlabels)
     plt.legend((p1[0], p2[0], p3[0]), ('CG', 'CHG', 'CHH'))
-    plt.xlabel("sequence")
-    plt.ylabel("methylation [ C/(C + T) ]")
+    plt.xlabel("Sequence Id")
+    plt.ylabel("Methylation [ C/(C + T) ]")
     if opts.title: plt.title(opts.title)
 
     plt.savefig(opts.out)
