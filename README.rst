@@ -68,8 +68,8 @@ The input to the pipeline is:
 
 * a reference fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped.
-* a fastq reads file. all reads must be the same length and must be from
-  Eckers/Zilberman bisulfite process
+* a fastq  or fasta reads file. all reads must be the same length and must be
+  from Eckers/Zilberman bisulfite process
 
 Output
 ======
@@ -110,7 +110,7 @@ Pipeline
 You must have:
 
     1) input reference fasta file to which to align the reads. here: `thaliana_v9.fasta`
-    2) a reads file in fastq format. here: `reads.fastq`.
+    2) a reads file in fastq or fasta format. here: `reads.fastq`.
     3) a directory containing the bowtie and bowtie-build
        executables. here: in `/usr/local/src/bowtie/`
 

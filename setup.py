@@ -20,6 +20,7 @@ setup(
     packages=['methylcoder'],
     zip_safe=False,
     requires=['numpy', 'pyfasta'],
+    test_suite="nose.collector",
     entry_points = {
         'console_scripts': ['methylcoder = methylcoder:main']
     }

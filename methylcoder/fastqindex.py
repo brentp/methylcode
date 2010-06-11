@@ -6,6 +6,8 @@ def is_up_to_date_b(a, b):
     return os.stat(a).st_mtime <= os.stat(b).st_mtime
 
 class FastQEntry(object):
+    lines = 4
+    bowtie_flag = 'q'
     __slots__ = ('name', 'seq', 'l3', 'qual', 'fpos')
     def __init__(self, fh):
         self.name = fh.readline().rstrip('\r\n')
@@ -13,8 +15,43 @@ class FastQEntry(object):
         self.l3 = fh.readline()
         self.qual = fh.readline().rstrip('\r\n')
 
+    @classmethod
+    def get_next_position(kls, fh):
+        key = fh.readline().rstrip("\n")
+        for i in range(kls.lines - 1): fh.readline()
+        return key
+
+def guess_index_class(filename):
+    assert os.path.exists(filename)
+    fh = open(filename)
+    header = fh.readline()
+    assert header[0] in '@>', (header, "should be fastq or fasta")
+    if header[0] == "@": return FastQIndex
+    return FastaIndex
+
+
+class FastaEntry(FastQEntry):
+    """
+    NOTE: this only handles 1 line sequence in the fasta file.
+    """
+    lines = 2
+    bowtie_flag = 'f'
+    __slots__ = ('name', 'seq')
+    def __init__(self, fh):
+        self.name = fh.readline().rstrip('\r\n')
+        self.seq = fh.readline().rstrip('\r\n')
+
+class RawEntry(FastQEntry):
+    lines = 1
+    bowtie_flag = 'r'
+    __slots__ = ('name', 'seq')
+    def __init__(self, fh):
+        self.seq = fh.readline().rstrip('\r\n')
+
+
 class FastQIndex(object):
-    ext = ".fidx"
+    ext = ".fqdx"
+    entry_class = FastQEntry
 
     def is_current(self):
         return is_up_to_date_b(self.filename, self.filename + self.ext)
@@ -32,22 +69,19 @@ class FastQIndex(object):
             pos = fh.tell()
             key = get_next_pos(fh)
             if not key: break
-            # always append the | but only used by multiple.
             db[key] = str(pos)
         fh.close()
         db.close()
 
-    def __init__(self, filename, call_class=FastQEntry, get_next_pos=None):
+    def __init__(self, filename):
         self.filename = filename
         self.fh = open(self.filename)
-        self.call_class = call_class
         if not self.is_current():
             try:
-                FastQIndex.create(self.filename, get_next_pos)
+                self.create(self.filename, self.entry_class.get_next_position)
             except:
                 os.unlink(self.filename + self.ext)
                 raise
-
         self.db = bsddb.btopen(filename + self.ext, 'r')
 
     def __getitem__(self, key):
@@ -55,7 +89,7 @@ class FastQIndex(object):
         pos = self.db.get(key, None)
         if pos is None: raise KeyError(key)
         self.fh.seek(long(pos))
-        return self.call_class(self.fh)
+        return self.entry_class(self.fh)
 
     def get_position(self, key):
         return long(self.db.get(key, None))
@@ -68,3 +102,13 @@ class FastQIndex(object):
 
     def iterkeys(self):
         return self.db.iterkeys()
+
+    def __contains__(self, key):
+        return key in self.db
+    contains = __contains__
+
+class FastaIndex(FastQIndex):
+    ext = '.fadx'
+    entry_class = FastaEntry
+    def __init__(self, filename):
+        FastQIndex. __init__(self, filename)
