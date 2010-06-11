@@ -207,6 +207,30 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
     fh_c2t_reads.seek(fpos)
     return IndexEntry(fh_raw_reads), IndexEntry(fh_c2t_reads)
 
+def methylation_summary(cs, ts, mt):
+    contexts = [('CG', (1, 4)), ('CHG', (2, 5)), ('CHH', (3, 6))]
+    m = {}
+    for context, (mp, mm) in contexts:
+        mask = (mt == mp) | (mt == mm)
+        mask &= ((cs + ts) > 0)
+        m[context] = {}
+        m[context]['cs'] = css = cs[mask].sum()
+        m[context]['ts'] = tss = ts[mask].sum()
+        m[context]['methylation'] = css / float(css + tss)
+    return m
+
+def print_summary(seqid, cs, ts, mtype, summary_counts):
+    ms = methylation_summary(cs, ts, mtype)
+    summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]" \
+              % (seqid, cs.sum(), ts.sum())
+    # print a quick summary of methylation for each context.
+    for context in sorted(summary_counts.keys()):
+        summary_counts[context]['cs'] += ms[context]['cs']
+        summary_counts[context]['ts'] += ms[context]['ts']
+        summary += (" %s: %.4f" % (context, ms[context]['methylation']))
+
+    print >>sys.stderr, summary
+
 def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
                       allowed_mismatches):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
@@ -314,31 +338,16 @@ def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
     for seqid in sorted(counts.keys()):
         cs = counts[seqid]['c']
         ts = counts[seqid]['t']
-        csum = float(cs.sum())
-        tsum = float(ts.sum())
-        mask = (cs + ts) > 0
-
-        cs.tofile(fc % seqid)
-        ts.tofile(ft % seqid)
-
 
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
 
-        # print a quick summary of methylation for each context.
-        summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]" \
-                  % (seqid, csum, tsum)
-        contexts = [('CG', (1, 4)), ('CHG', (2, 5)), ('CHH', (3, 6))]
-        for context, (mp, mm) in contexts:
-            ctx = (mtype == mp) | (mtype == mm)
-            ctx_mask = mask & ctx
-            summary_counts[context]['cs'] += cs[ctx_mask].sum()
-            summary_counts[context]['ts'] += ts[ctx_mask].sum()
-            meth = (cs[ctx_mask].astype('f') / (cs[ctx_mask] + ts[ctx_mask]))
-            summary += (" %s: %.4f" % (context, meth.mean()))
-        print >>sys.stderr, summary.rstrip(",")
+        print_summary(seqid, cs, ts, mtype, summary_counts)
 
+        cs.tofile(fc % seqid)
+        ts.tofile(ft % seqid)
         mtype.tofile(fmethyltype % seqid)
+
         to_text_file(cs, ts, mtype, seqid, out)
 
     print >>sys.stderr, "genome-wide: methylation (cs, ts)"
