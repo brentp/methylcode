@@ -111,25 +111,26 @@ You must have:
 
     1) input reference fasta file to which to align the reads. here: `thaliana_v9.fasta`
     2) a reads file in fastq format. here: `reads.fastq`.
-    3) bowtie built in a directory. here: `/usr/local/src/bowtie/`
-    4) an `out/` directory to send the results.
+    3) a directory containing the bowtie and bowtie-build
+       executables. here: in `/usr/local/src/bowtie/`
 
 An example command to run the pipeline is::
 
     $ methylcoder --bowtie=/usr/local/src/bowtie/ \
                   --reads /path/to/reads.fastq \
-                  --outdir out/   \
                   --reference /path/to/thaliana_v9.fasta
 
-Where you must adjust `/path/to/` to the appropriate paths and `outdir` must exist.
+Where you must adjust `/path/to/reads.fastq` to point to your BS-treated reads.
 This will create the files specified in `Output`_ above, sending the text to
-`out/methy-data-DATE.txt` where DATE is the current date. The binary files will
-be sent to, for example: `out/thaliana_v9.fasta.[CHR].methyl.bin` where [CHR] is
-substituted by each chromosome in the fasta file. Once bowtie is run once,
-its output is not deleted, and methylcoder.py will only re-run bowtie if its
-input has been modified since it was run last. *NOTE* if the `methylcoder`
-executable is called without any options, it will print help and available
-command-line arguments.
+`path/to/reads_methylcoder/methy-data-DATE.txt` where DATE is the current date.
+The binary files will be sent to, that same directory as:
+`thaliana_v9.fasta.[CHR].methyl.bin` where [CHR] is substituted by each
+chromosome in the fasta file. Once bowtie is run once, its output is not
+deleted, and methylcoder.py will only re-run bowtie if its input has been
+modified since it was run last. *NOTE* if the `methylcoder` executable is
+called without any options, it will print help and available command-line
+arguments.
+
 Additional args can be sent directly to bowtie as a string to methylcoder.py's
 --bowtie_args parameter. This would look like. ::
 
