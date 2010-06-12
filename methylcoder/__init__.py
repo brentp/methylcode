@@ -100,10 +100,6 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, bowtie_sequence_flag,
            "--chunkmbs 1024 --norc --best -p %(threads)d %(ref_path)s " + \
            "-%(bowtie_sequence_flag)s %(reads_c2t)s") % locals()
 
-    if opts.k is not None: cmd += " -k %i" % opts.k
-    if opts.m is not None: cmd += " -m %i" % opts.m
-    if opts.mismatches >= 0: cmd += " -v  %i" % opts.mismatches
-
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
 
@@ -490,12 +486,13 @@ def main():
                  " be specified inside a string. e.g.: "
                  "--bowtie_args '--strata --solexa-quals'")
 
-    p.add_option("-v", "--mismatches", dest="mismatches", type="int", default=0,
-             help="number of mismatches allowed. sent to bowtie executable")
+    p.add_option("--mismatches", dest="mismatches", type="int", default=0,
+             help="number of mismatches allowed. NOT sent to bowtie executable"
+                " used to improve mapping accuracy after seeing reads aligned"
+                " with original genome. use bowtie_args to send to bowtie."
+                " default: %default")
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
-    p.add_option("-k", dest="k", type='int', help="bowtie's -k parameter", default=None)
-    p.add_option("-m", dest="m", type='int', help="bowtie's -m parameter", default=None)
 
     opts, args = p.parse_args()
 
