@@ -219,17 +219,41 @@ def methylation_summary(cs, ts, mt):
         m[context]['methylation'] = css / float(css + tss)
     return m
 
-def print_summary(seqid, cs, ts, mtype, summary_counts):
+def print_genome_summary(summary_counts):
+    """
+    like print_summary() except does the genome-wide averages"
+    """
+    genome_dict = dict(seqid='genome-wide', total_cs=0, total_ts=0)
+    #print >>sys.stderr, "genome-wide: methylation (cs, ts)"
+    for ctx in summary_counts.keys():
+        d = summary_counts[ctx]
+        genome_dict["%s_cs" % ctx] = d['cs']
+        genome_dict["%s_ts" % ctx] = d['ts']
+        genome_dict[ctx] = d['cs'] / float(d['cs'] + d['ts'])
+        genome_dict['total_cs'] += d['cs']
+        genome_dict['total_ts'] += d['ts']
+
+    print >>sys.stderr, print_summary.format % genome_dict
+
+def print_summary(seqid, cs, ts, mtype, summary_counts, print_header=False):
     ms = methylation_summary(cs, ts, mtype)
-    summary = "chr: %-12s cs: %-12i ts: %-12i [methylation]" \
-              % (seqid, cs.sum(), ts.sum())
+    if print_header:
+        header = print_summary.format.replace("-12i", "-12s").replace(".6f", "8s")
+        labels = "seqid total_cs total_ts CG CG_cs CG_ts CHG CHG_cs CHG_ts CHH CHH_cs CHH_ts".split()
+        print >>sys.stderr, header % dict(zip(labels, labels))
+    d = {'seqid': seqid, 'total_cs': cs.sum(), 'total_ts': ts.sum()}
     # print a quick summary of methylation for each context.
     for context in sorted(summary_counts.keys()):
+        d["%s_cs" % context] = ms[context]['cs']
+        d["%s_ts" % context] = ms[context]['ts']
+        d[context]           = ms[context]['methylation']
+
         summary_counts[context]['cs'] += ms[context]['cs']
         summary_counts[context]['ts'] += ms[context]['ts']
-        summary += (" %s: %.4f" % (context, ms[context]['methylation']))
+        #summary += (" %s: %.4f" % (context, ms[context]['methylation']))
 
-    print >>sys.stderr, summary
+    print >>sys.stderr, print_summary.format % d
+print_summary.format = "%(seqid)-12s %(total_cs)-12i %(total_ts)-12i %(CG)-.6f %(CG_cs)-12i %(CG_ts)-12i %(CHG)-.6f %(CHG_cs)-12i %(CHG_ts)-12i %(CHH)-.6f %(CHH_cs)-12i %(CHH_ts)-12i "
 
 def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
                       allowed_mismatches):
@@ -335,14 +359,14 @@ def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
     for ctx in summary_counts.keys():
         summary_counts[ctx] = {'cs': 0, 'ts': 0}
 
-    for seqid in sorted(counts.keys()):
+    for i, seqid in enumerate(sorted(counts.keys())):
         cs = counts[seqid]['c']
         ts = counts[seqid]['t']
 
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
 
-        print_summary(seqid, cs, ts, mtype, summary_counts)
+        print_summary(seqid, cs, ts, mtype, summary_counts, print_header=(i==0))
 
         cs.tofile(fc % seqid)
         ts.tofile(ft % seqid)
@@ -350,11 +374,7 @@ def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
 
         to_text_file(cs, ts, mtype, seqid, out)
 
-    print >>sys.stderr, "genome-wide: methylation (cs, ts)"
-    for ctx in sorted(summary_counts.keys()):
-        d = summary_counts[ctx]
-        print >>sys.stderr, "%s: %.5f (%i %i)" % \
-                (ctx, d['cs'] / float(d['cs'] + d['ts']), d['cs'], d['ts'])
+    print_genome_summary(summary_counts)
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     """
@@ -389,6 +409,8 @@ def convert_reads_c2t(reads_path):
     assumes all capitals returns the new path and creates and index.
     """
 
+    # the index can be either for Fasta or FastQ file.
+    # determine that here by the start of the header > or @
     IndexClass = guess_index_class(reads_path)
     c2t = reads_path + ".c2t"
     idx = c2t + IndexClass.ext
