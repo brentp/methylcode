@@ -2,7 +2,7 @@ import unittest
 import os.path as op
 import sys
 import os
-from methylcoder import bin_paths_from_fasta, _update_conversions
+from methylcoder import bin_paths_from_fasta, _update_conversions, methylation_summary
 import numpy as np
 
 PATH = op.dirname(__file__)
@@ -58,6 +58,54 @@ class TestCountConversions(unittest.TestCase):
             if t != 0:
                 self.assertEquals(r, "G")
                 self.assertEquals(a, "A")
+
+class TestMethylationSummary(unittest.TestCase):
+    def setUp(self):
+        self.cs = np.zeros((10, ), 'i')
+        self.ts = np.zeros((10, ), 'i')
+        self.cs[4:6] = 2
+        self.ts[4:6] = 2
+
+    def test_cg_ctx(self):
+        CTX = 'CG'
+        mt = np.zeros((10, ), 'i')
+
+        # only set CG
+        mt[4:6] = 1
+        m = methylation_summary(self.cs, self.ts, mt)
+        tsum = self.ts.sum()
+        csum = self.cs.sum()
+        self.assertEquals(m[CTX]['cs'], csum)
+        self.assertEquals(m[CTX]['ts'], tsum)
+        self.assertEquals(m[CTX]['methylation'], csum / float(csum + tsum))
+
+    def test_chg_ctx(self):
+        CTX = 'CHG'
+        mt = np.zeros((10, ), 'i')
+
+        # only set CG
+        mt[4:6] = 2
+        mt[1:5] = 5
+        m = methylation_summary(self.cs, self.ts, mt)
+        tsum = self.ts.sum()
+        csum = self.cs.sum()
+        self.assertEquals(m[CTX]['cs'], csum)
+        self.assertEquals(m[CTX]['ts'], tsum)
+        self.assertEquals(m[CTX]['methylation'], csum / float(csum + tsum))
+
+    def test_chh_ctx(self):
+        CTX = 'CHH'
+        mt = np.zeros((10, ), 'i')
+
+        # only set CG
+        mt[4:6] = 3
+        mt[1:5] = 6
+        m = methylation_summary(self.cs, self.ts, mt)
+        tsum = self.ts.sum()
+        csum = self.cs.sum()
+        self.assertEquals(m[CTX]['cs'], csum)
+        self.assertEquals(m[CTX]['ts'], tsum)
+        self.assertEquals(m[CTX]['methylation'], csum / float(csum + tsum))
 
 
 if __name__ == "__main__":
