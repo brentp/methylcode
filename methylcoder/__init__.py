@@ -33,20 +33,29 @@ except ImportError:
     import processing
     CPU_COUNT = processing.cpuCount()
 
-def write_c2t(fasta_name):
+def write_c2t(fasta_name, convert):
     """
     given a fasta file, write a new file:
         `some.fr.c2t.fasta` which contains:
           + the same headers prefixed with 'f' with all C's converted to T
           + headers prefixed with 'r' reverse complemented with
                                  all C's converted to T.
+
+    if convert is false, the c2t conversion is not done but the forward,
+    and reverse mappings are done.
     """
     d = op.join(op.dirname(fasta_name), "bowtie_index")
     if not op.exists(d): os.mkdir(d)
 
     p, ext = op.splitext(op.basename(fasta_name)) # some.fasta -> some, fasta
-    fname = "%s/%s.fr.c2t%s" % (d, p, ext)
-    if op.exists(fname): return fname
+    if convert:
+        fname = "%s/%s.fr.c2t%s" % (d, p, ext)
+        if op.exists(fname): return fname
+    else:
+        # no conversion, just copy the file into the index dir.
+        fname = "%s/%s.fr%s" % (d, p, ext)
+        if op.exists(fname): return fname
+
     fasta = Fasta(fasta_name)
 
     c2t_fh = open(fname, 'w')
@@ -58,10 +67,11 @@ def write_c2t(fasta_name):
             assert not ">" in seq
             # c2t, prefix header with f and write
             print >>c2t_fh, ">f%s" % header
-            print >>c2t_fh, seq.replace('C', 'T')
+            print >>c2t_fh, seq.replace('C', 'T') if convert else seq
             # then r-c, c2t, prefix header with r and write
             print >>c2t_fh, ">r%s" % header
-            print >>c2t_fh, revcomp(seq).replace('C', 'T')
+            rseq = revcomp(seq)
+            print >>c2t_fh, rseq.replace('C', 'T') if convert else rseq
 
         c2t_fh.close()
     except:
@@ -539,22 +549,24 @@ def main():
     if not (opts.reads and opts.bowtie):
         sys.exit(p.print_help())
 
+    do_convert = not opts.no_convert
+
     out_dir = opts.out_dir = get_out_dir(opts.out_dir, opts.reads)
     fasta = get_fasta(opts, args)
-    fr_c2t = write_c2t(fasta)
+    fr_c2t = write_c2t(fasta, do_convert)
 
 
     run_bowtie_builder(opts.bowtie, fr_c2t)
 
     raw_reads = opts.reads
-    c2t_reads, c2t_index = convert_reads_c2t(raw_reads, not opts.no_convert)
+    c2t_reads, c2t_index = convert_reads_c2t(raw_reads, do_convert)
     ref_base = op.splitext(fr_c2t)[0]
 
     try:
         IndexClass = c2t_index.__class__
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
         sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args, bowtie_reads_flag)
-        count_conversions(fasta, sam, raw_reads, IndexClass, opts.out_dir, opts.mismatches, not opts.no_convert)
+        count_conversions(fasta, sam, raw_reads, IndexClass, opts.out_dir, opts.mismatches, do_convert)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
