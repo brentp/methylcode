@@ -119,19 +119,30 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, bowtie_sequence_flag,
 
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
 def parse_sam(sam_aln_file, chr_lengths, get_records):
-
+    unmapped = open(op.dirname(sam_aln_file) + "/unmapped", "w")
+    print >>sys.stderr, "writing unmapped reads to %s" % (unmapped.name, )
     for sline in open(sam_aln_file):
         # comment.
         if sline[0] == "@": continue
         # it was excluded because of -M
         line = sline.split("\t")
+        read_id = line[0]
         # no reported alignments.
-        if line[1] == '4': continue
+        # extra via -m
+        if line[1] == '4':
+            if not "XM:i:0" in sline:
+                # write stuff that was excluded because of too many mappings.
+                raw_fastq, converted_fastq = get_records(read_id)
+                print >> unmapped, str(raw_fastq)
+            continue
         # extra found via -M
-        if line[4] == '0': continue
+        if line[4] == '0':
+            raw_fastq, converted_fastq = get_records(read_id)
+            print >> unmapped, str(raw_fastq)
+            continue
+
         assert line[1] == '0', line
 
-        read_id = line[0]
         seqid = line[2]
         direction = seqid[0]
         assert direction in 'fr'
@@ -252,16 +263,38 @@ def print_summary(seqid, cs, ts, mtype, summary_counts, print_header=False):
     print >>sys.stderr, print_summary.format % d
 print_summary.format = "%(seqid)-12s %(total_cs)-12i %(total_ts)-12i %(CG)-.6f %(CG_cs)-12i %(CG_ts)-12i %(CHG)-.6f %(CHG_cs)-12i %(CHG_ts)-12i %(CHH)-.6f %(CHH_cs)-12i %(CHH_ts)-12i "
 
+
+def get_counts(fcpatt, ftpatt, fa):
+
+    counts = {}
+    for seqid in fa.iterkeys():
+        seq = fa[seqid]
+        fc = fcpatt % seqid
+        ft = ftpatt % seqid
+        tc = {}
+        if op.exists(fc) and op.exists(ft):
+            print >>sys.stderr, "using existing files: %s, %s" % (fc, ft)
+            tc = {'t': np.fromfile(ft, dtype=np.uint32),
+                  'c': np.fromfile(fc, dtype=np.uint32)}
+        else:
+            tc = {'t': np.zeros((len(seq),), dtype=np.uint32),
+                   # total reads in which this c changed to t
+                  'c': np.zeros((len(seq),), dtype=np.uint32)}
+        assert len(seq) == len(tc['t']) == len(tc['c'])
+        counts[seqid] = tc
+    return counts
+
 def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
-                      allowed_mismatches):
+                      allowed_mismatches, convert):
     # direction is either 'f'orward or 'r'everse. if reverse, need to subtract
     # from length of chromsome.
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
+    converted_reads = raw_reads + (".c2t" if convert else "")
 
-    fqidx = index_class(raw_reads + ".c2t")
+    fqidx = index_class(converted_reads)
     fa = Fasta(original_fasta)
     fh_raw_reads = open(raw_reads, 'r')
-    fh_c2t_reads = open(raw_reads + ".c2t", 'r')
+    fh_c2t_reads = open(converted_reads, 'r')
 
     def get_records(header):
         return get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads)
@@ -275,16 +308,11 @@ def count_conversions(original_fasta, sam_file, raw_reads, index_class, out_dir,
     fc, ft, fmethyltype = \
             bin_paths_from_fasta(original_fasta, out_dir)
 
-    counts = {}
-    for k in fa.iterkeys():
         # so this will be a dict of position => conv
         # here we add to fc and ft np.fromfile() from the forward,
         # and add to it in the reverse. otherwise, just overwriting
         # below.
-        counts[k] = {'t': np.zeros((len(fa[k]),), dtype=np.uint32),
-                     # total reads in which this c changed to t
-                     'c': np.zeros((len(fa[k]),), dtype=np.uint32)}
-        assert len(fa[k]) == len(counts[k]['t']) == len(counts[k]['c'])
+    counts = get_counts(fc, ft, fa)
 
     skipped = 0
     align_count = 0
@@ -401,7 +429,7 @@ $SAMTOOLS index %(odir)s/methylcoded.bam
     """ % dict(odir=out_dir, fapath=fasta.fasta_name)
     out.close()
 
-def convert_reads_c2t(reads_path):
+def convert_reads_c2t(reads_path, convert=True):
     """
     assumes all capitals returns the new path and creates and index.
     """
@@ -409,11 +437,15 @@ def convert_reads_c2t(reads_path):
     # the index can be either for Fasta or FastQ file.
     # determine that here by the start of the header > or @
     IndexClass = guess_index_class(reads_path)
-    c2t = reads_path + ".c2t"
+    # if convert is false, then we just return the original file.
+    c2t = reads_path + (".c2t" if convert else "")
     idx = c2t + IndexClass.ext
 
     if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx):
         return c2t, IndexClass(c2t)
+    if not convert:
+        return c2t, IndexClass(c2t)
+
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
 
     try:
@@ -453,9 +485,14 @@ def get_fasta(opts, args):
         fasta = args[0]
         assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
     if glob.glob("%s/*.bin" % opts.out_dir):
-        print >>sys.stderr, "PLEASE use an empty out directory or move "\
-                "the existing .bin files from %s" % opts.out_dir
-        sys.exit(1)
+        cmd = raw_input("""%s already contains .bin files. do you want to:
+                        (U)pate them with this data.
+                        (D)elete them.
+                        (A)bort ? """ % opts.out_dir).rstrip().upper()[0]
+        if cmd == "A":
+            sys.exit(1)
+        elif cmd == "D":
+            for f in glob.glob("%s/*.bin" % opts.out_dir): os.unlink(f)
     return fasta
 
 def get_out_dir(out_dir, reads):
@@ -481,6 +518,8 @@ def main():
     p.add_option("--reads", dest="reads", help="path to fastq reads file")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
+    p.add_option("--no-convert", dest="no_convert", action="store_true", 
+                 default=False, help="dont do c2t conversion")
 
     p.add_option("--bowtie_args", dest="bowtie_args", default="",
                  help="any extra arguments to pass directly to bowtie. must "
@@ -508,14 +547,14 @@ def main():
     run_bowtie_builder(opts.bowtie, fr_c2t)
 
     raw_reads = opts.reads
-    c2t_reads, c2t_index = convert_reads_c2t(raw_reads)
+    c2t_reads, c2t_index = convert_reads_c2t(raw_reads, not opts.no_convert)
     ref_base = op.splitext(fr_c2t)[0]
 
     try:
         IndexClass = c2t_index.__class__
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
         sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args, bowtie_reads_flag)
-        count_conversions(fasta, sam, raw_reads, IndexClass, opts.out_dir, opts.mismatches)
+        count_conversions(fasta, sam, raw_reads, IndexClass, opts.out_dir, opts.mismatches, not opts.no_convert)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
