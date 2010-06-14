@@ -6,7 +6,7 @@ import os.path as op
 import sys
 sys.path.insert(0, op.dirname(__file__))
 
-#import methylcoder
+import methylcoder.version as V
 
 ext_modules = [ Extension("methylcoder/cbowtie",
                 sources=["methylcoder/cbowtie.c"],
@@ -15,7 +15,7 @@ ext_modules = [ Extension("methylcoder/cbowtie",
 setup(
     license="BSD",
     name = "methylcoder",
-    #version = methylcoder.__version__,
+    version = V.version,
     ext_modules = ext_modules,
     packages=['methylcoder'],
     zip_safe=False,

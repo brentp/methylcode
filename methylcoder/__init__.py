@@ -3,7 +3,6 @@ generate methylation data given a reference genome and a set of bisulfite
 treated reads.
 """
 
-__version__ = "0.2.5"
 
 from pyfasta import Fasta
 import numpy as np
@@ -20,6 +19,8 @@ import glob
 import datetime
 np.seterr(divide="ignore")
 
+import version
+__version__ = version.version
 
 def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
     return s.translate(_comp)[::-1]
