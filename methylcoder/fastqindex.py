@@ -21,6 +21,9 @@ class FastQEntry(object):
         for i in range(kls.lines - 1): fh.readline()
         return key
 
+    def __str__(self):
+        return "\n".join((self.name, self.seq, self.l3, self.qual))
+
 def guess_index_class(filename):
     assert os.path.exists(filename)
     fh = open(filename)
@@ -40,6 +43,8 @@ class FastaEntry(FastQEntry):
     def __init__(self, fh):
         self.name = fh.readline().rstrip('\r\n')
         self.seq = fh.readline().rstrip('\r\n')
+    def __str__(self):
+        return "\n".join((self.name, self.seq))
 
 class RawEntry(FastQEntry):
     lines = 1
@@ -69,7 +74,7 @@ class FastQIndex(object):
             pos = fh.tell()
             key = get_next_pos(fh)
             if not key: break
-            db[key] = str(pos)
+            db[key[1:]] = str(pos)
         fh.close()
         db.close()
 
