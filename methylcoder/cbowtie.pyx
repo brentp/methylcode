@@ -19,20 +19,22 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
     cdef char a, b
     # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]
-    for i in range(n):
-        # if genome is a T and read is a C
-        # bowtie couldnt find this cause we
-        # converted C to T.
-        if ref_seq[i] != c2: continue
-        if aln_seq[i] == c1: 
-            if allowed_mismatches == 0: return 1
-            allowed_mismatches -= 1
-    if allowed_mismatches < 0: return 1
+    if allowed_mismatches > -1:
+        for i in range(n):
+            # if genome is a T and read is a C
+            # bowtie couldnt find this cause we
+            # converted C to T.
+            if ref_seq[i] != c2: continue
+            if aln_seq[i] == c1: 
+                if allowed_mismatches == 0: return 1
+                allowed_mismatches -= 1
+        if allowed_mismatches < 0: return 1
 
     # for proofing.
     """
-    sys.stderr.write("ref:" + ref_seq + "\n")
-    sys.stderr.write("aln:" + aln_seq + "\n")
+    if allowed_mismatches < 0:
+        sys.stderr.write("ref:" + ref_seq + "\n")
+        sys.stderr.write("aln:" + aln_seq + "\n")
     tts = 0
     ccs = 0
     d = ["."] * n
@@ -45,14 +47,17 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
         # CC
         if b == c1:
             c_count[base_position + i] += 1
+            # debug
             #d[i] = chr(c1); ccs += 1
         # CT
         elif b == c2:
             t_count[base_position + i] += 1
+            # debug
+            #d[i] = chr(c2); tts += 1
     """
-            d[i] = chr(c2); tts += 1
-    sys.stderr.write("mat:" + "".join(d) + "\n")
-    sys.stderr.write("remained     c: %i\n" % ccs)
-    sys.stderr.write("converted to t: %i\n\n" % tts)
+    if allowed_mismatches < 0:
+        sys.stderr.write("mat:" + "".join(d) + "\n")
+        sys.stderr.write("remained     c: %i\n" % ccs)
+        sys.stderr.write("converted to t: %i\n\n" % tts)
     """
     return 0
