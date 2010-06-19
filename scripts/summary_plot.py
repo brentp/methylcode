@@ -97,6 +97,8 @@ if __name__ == "__main__":
     p.add_option("--out", dest="out", default="/var/www/t/met.png", help=\
                  "path to save image. extension (.png/.pdf) will determine file-type")
     p.add_option("--title", dest="title", default="", help="image title")
+    p.add_option("--exclude", dest="exclude", default=None,
+                help="exclude these chromosomes. e.g. --exclude 'm|c'")
     p.add_option("--labels", dest="labels", default=None, help="by default, "
                  "the directories specified in args are used to label the series "
                  "when plotting more than one directory. if --labels are specified "
@@ -109,11 +111,14 @@ if __name__ == "__main__":
         sys.exit(p.print_help())
 
     ctms = []
+    exclude = [] if opts.exclude is None else opts.exclude.split("|")
     for bin_dir in args:
         cs = glob.glob("%s/*.c.bin" % bin_dir)
+        cs = [c for c in cs if not any(c.endswith("%s.c.bin" % e) for e in exclude)]
         assert cs
         ts = [c.replace('.c.bin', '.t.bin') for c in cs]
         mt = [c.replace('.c.bin', '.methyltype.bin') for c in cs]
+        print cs
 
         ctms.append(zip(cs, ts, mt))
 
