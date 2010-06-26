@@ -70,5 +70,5 @@ chm=tMethylated,000000,0,2,12|tTotal+Sites,000000,1,2,12
            CGP=P['CG'], CHGP=P['CHG'], CHHP=P['CHH'],
            ymax=ymax, CGPCT=CGPCT, CHGPCT=CHGPCT, CHHPCT=CHHPCT)
 
-chart = 'http://chart.apis.google.com/chart?' + chart.replace("\n|", "").replace("\n", "&")
+chart = 'http://chart.apis.google.com/chart?' + chart.replace("\n|", "|").replace("\n", "&")
 print chart
