@@ -1,6 +1,18 @@
 """
 generate methylation data given a reference genome and a set of bisulfite
-treated reads.
+treated reads. usage:
+
+    methylcoder [options] reads.fastq (or fasta)
+
+  or for pair-end reads:
+
+    methylcoder [options] reads1.fastq reads2.fastq
+
+any arguments to bowtie should be sent as a string via --bowtie_args.
+e.g. --bowtie_args "--phred64-quals -m 1 --fr "
+
+NOTE: it is highly recommended to use -m 1 to ensure unique mappings.
+
 """
 from pyfasta import Fasta
 import numpy as np
@@ -104,20 +116,25 @@ def is_same_cmd(cmd, prev_file):
     return op.exists(prev_file) and \
         cmd.strip() == open(prev_file).read().strip()
 
-def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, bowtie_sequence_flag,
+def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag,
                threads=CPU_COUNT):
     out_dir = opts.out_dir
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
     cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --sam --sam-nohead " + \
-           "--chunkmbs 1024 --norc --best -p %(threads)d %(ref_path)s " + \
-           "-%(bowtie_sequence_flag)s %(reads_c2t)s") % locals()
+           "--chunkmbs 1024 --norc -p %(threads)d %(ref_path)s " + \
+           "-%(bowtie_sequence_flag)s ") % locals()
+    # single end reads
+    if len(reads_list_c2t) == 1:
+        cmd +=" --best %s" % reads_list_c2t[0]
+    else:
+        cmd += " -1 %s -2 %s" % tuple(reads_list_c2t)
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
     print >>sys.stderr, cmd.replace("//", "/")
 
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
-       is_up_to_date_b(reads_c2t, sam_out_file) and \
+       is_up_to_date_b(reads_list_c2t[0], sam_out_file) and \
        is_same_cmd(cmd, sam_out_file + ".bowtie.sh"):
 
         print >>sys.stderr, "^ up to date, not running ^"
@@ -133,6 +150,7 @@ def run_bowtie(opts, ref_path, reads_c2t, bowtie_args, bowtie_sequence_flag,
 def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
     unmapped = open(unmapped_name, "w")
     print >>sys.stderr, "writing unmapped reads to %s" % (unmapped.name, )
+    idx = 0
     for sline in open(sam_aln_file):
         # comment.
         if sline[0] == "@": continue
@@ -144,16 +162,24 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
         if line[1] == '4':
             if not "XM:i:0" in sline:
                 # write stuff that was excluded because of too many mappings.
-                raw_fastq, converted_fastq = get_records(read_id)
+                raw_fastq, converted_fastq = get_records(read_id, 0)
                 print >> unmapped, str(raw_fastq)
             continue
         # extra found via -M
-        if line[4] == '0':
-            raw_fastq, converted_fastq = get_records(read_id)
+        if line[4] == '0' and line[1] == '0':
+            raw_fastq, converted_fastq = get_records(read_id, 0)
             print >> unmapped, str(raw_fastq)
             continue
 
-        assert line[1] == '0', line
+        pair_end = line[1] != '0'
+        if pair_end:
+            # if the pair doesn't map to same place, skip.
+            if line[6] != "=": continue
+            # flags are (1 | 2 | 32 | 64) or (1 | 2 | 16 | 128)
+            idx = 0 if pair_end == '99' else 0
+            # bowtie prints the alignment without the pair end info.
+            # add back /0 or /1 here.
+            read_id = read_id + "/" + str(idx + 1)
 
         seqid = line[2]
         direction = seqid[0]
@@ -170,7 +196,7 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
         # read_id is the line in the file.
         #fh_raw_reads.seek((read_id * read_len) + read_id)
         #raw_seq = fh_raw_reads.read(read_len)
-        raw_fastq, converted_fastq = get_records(read_id)
+        raw_fastq, converted_fastq = get_records(read_id, idx)
         read_len = len(converted_seq)
         raw_seq = raw_fastq.seq
 
@@ -183,7 +209,7 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
             line[9] = raw_seq = revcomp(raw_seq)
             # flip the quality as well.
             line[10] = line[10][::-1]
-            line[1] = '16' # alignment on reverse strand.
+            line[1] = str(int(line[1]) + 16) # alignment on reverse strand.
             converted_seq = revcomp(converted_fastq.seq)
 
         # NM:i:2
@@ -296,18 +322,19 @@ def get_counts(fcpatt, ftpatt, fa):
         counts[seqid] = tc
     return counts
 
-def count_conversions(original_fasta, sam_file, raw_reads, c2t_reads, index_class, out_dir,
+def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, index_class, out_dir,
                       allowed_mismatches, mode='w', counts=None):
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
 
-    fqidx = index_class(c2t_reads)
+    fh_raw_reads_list = [open(raw_reads) for raw_reads in raw_reads_list]
+    fh_c2t_reads_list = [open(c2t_reads) for c2t_reads in c2t_reads_list]
+    fqidx_list = [index_class(c2t_reads) for c2t_reads in c2t_reads_list]
     fa = Fasta(original_fasta)
-    fh_raw_reads = open(raw_reads, 'r')
-    fh_c2t_reads = open(c2t_reads, 'r')
+    #fh_raw_reads = open(raw_reads, 'r')
+    #fh_c2t_reads = open(c2t_reads, 'r')
 
-    def get_records(header):
-        return get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads)
-
+    def get_records(header, idx):
+        return get_raw_and_c2t(header, fqidx_list[idx], fh_raw_reads_list[idx], fh_c2t_reads_list[idx])
 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
@@ -495,13 +522,12 @@ def convert_reads_c2t(reads_path):
         raise
     return c2t, IndexClass(c2t)
 
-def get_fasta(opts, args):
+def get_fasta(opts):
     "all the stuff to get the fasta from cmd line in single spot"
     fasta = opts.reference
     if fasta is None:
-        assert len(args) == 1, "must specify path to fasta file"
-        fasta = args[0]
-        assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
+        raise Exception("must specify path to fasta file")
+    assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
     if glob.glob("%s/*.bin" % opts.out_dir):
         cmd = raw_input("""%s already contains .bin files. do you want to:
                         (U)pate them with this data.
@@ -514,7 +540,7 @@ def get_fasta(opts, args):
     return fasta
 
 def get_out_dir(out_dir, reads):
-    out_dir = out_dir or op.splitext(reads)[0] + "_methylcoder"
+    out_dir = out_dir or op.splitext(reads[0])[0] + "_methylcoder"
     if not op.exists(out_dir):
         os.makedirs(out_dir)
     print >>sys.stderr, "using %s for writing output" % out_dir
@@ -533,13 +559,12 @@ def main():
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
-    p.add_option("--reads", dest="reads", help="path to fastq reads file")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
     p.add_option("--unconverted", dest="unconverted", action="store_true",
                  default=False, help="map unconverted reads against "
                  "unconverted genome in addtion to mapping c2t reads against"
-                 " c2t genome.")
+                 " c2t genome. only works for un-paired reads.")
 
     p.add_option("--bowtie_args", dest="bowtie_args", default="",
                  help="any extra arguments to pass directly to bowtie. must "
@@ -554,15 +579,15 @@ def main():
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
 
-    opts, args = p.parse_args()
+    opts, read_paths = p.parse_args()
 
-    if not (opts.reads and opts.bowtie):
+    if not (len(read_paths) in (1, 2) and opts.bowtie):
         sys.exit(p.print_help())
 
-    unconverted = opts.unconverted
+    unconverted = opts.unconverted and len(read_paths) == 1
 
-    out_dir = opts.out_dir = get_out_dir(opts.out_dir, opts.reads)
-    fasta = get_fasta(opts, args)
+    out_dir = opts.out_dir = get_out_dir(opts.out_dir, read_paths)
+    fasta = get_fasta(opts)
 
     fr_c2t, fr_unc = write_c2t(fasta, unconverted)
 
@@ -571,18 +596,21 @@ def main():
     if pc2t: pc2t.wait()
     if punc: punc.wait()
 
-    raw_reads = opts.reads
-    c2t_reads, c2t_index = convert_reads_c2t(raw_reads)
-    IndexClass = c2t_index.__class__
+    IndexClass = None
+    c2t_reads_list = []
+    for read_path in read_paths:
+        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_path)
+        IndexClass = c2t_reads_index.__class__
+        c2t_reads_list.append(c2t_reads_path)
 
 
     ref_base = op.splitext(fr_c2t)[0]
 
     try:
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
-        sam = run_bowtie(opts, ref_base, c2t_reads, opts.bowtie_args, bowtie_reads_flag)
-        counts, unmatched = count_conversions(fasta, sam, raw_reads, c2t_reads, IndexClass, opts.out_dir, opts.mismatches)
-        if unconverted:
+        sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.bowtie_args, bowtie_reads_flag)
+        counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches)
+        if unconverted and len(c2t_reads_list) == 1:
             sam = run_bowtie(opts, ref_base, unmatched, opts.bowtie_args, bowtie_reads_flag)
             counts, _ = count_conversions(fasta, sam, unmatched, unmatched,  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts)
