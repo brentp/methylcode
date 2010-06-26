@@ -142,7 +142,9 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
 
     process = Popen(cmd, shell=True)
     print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
-    process.wait()
+    if process.wait() != 0:
+        print >>sys.stderr, "errors running bowtie"
+        sys.exit(1)
     return sam_out_file
 
 
@@ -593,8 +595,10 @@ def main():
 
     pc2t = run_bowtie_builder(opts.bowtie, fr_c2t)
     punc = run_bowtie_builder(opts.bowtie, fr_unc) if unconverted else None
-    if pc2t: pc2t.wait()
-    if punc: punc.wait()
+    if pc2t:
+        if pc2t.wait() != 0: sys.exit(1)
+    if punc:
+        if punc.wait() != 0: sys.exit(1)
 
     IndexClass = None
     c2t_reads_list = []
