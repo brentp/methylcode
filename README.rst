@@ -1,10 +1,10 @@
 MethylCoder
 ===========
 
-Python code and shell scripts for fast, simple processing of BiSulfite reads
+Single entry point for fast, simple processing of bisulfite-treated reads
 into methylation data. Also includes scripts for analysis and visualization.
-In addition to a binary output, the direct output of methylcoder is a text file
-that looks like ::
+In addition to a binary output and a SAM alignment file, the direct output
+of methylcoder is a text file that looks like ::
 
     #seqid  mt  bp  c   t
     1   3   1354    0   1
@@ -24,9 +24,8 @@ at every methylable basepair easily calculated as c / (c + t).
 About
 =====
 
-This software is distributed under the BSD License and possible because of
-the `Fischer Lab`_ . Please report any bugs, patches, problems, docs to
-bpederse@gmail.com
+This software is developed in the `Fischer Lab`_ . At UC Berkeley.
+Please report any requests, bugs, patches, problems, docs to bpederse@gmail.com
 
 It is distributed under the `New BSD License <http://github.com/brentp/methylcode/blob/master/LICENSE>`_
 
@@ -37,6 +36,7 @@ Requirements
 Python
 ------
 
+Python 2.6 must be installed along with the following modules.
 all of these are available from pypi and as such are installable via
 ::
 
@@ -44,6 +44,8 @@ all of these are available from pypi and as such are installable via
 
 * `numpy`_ to handle arrays and binary data in python
 * `pyfasta`_ to access/index fasta files
+
+matplotlib is required to plot the per-chromosome methylation levels.
 
 C
 -
@@ -53,8 +55,16 @@ C
 
 Installation
 ------------
-once the above python and c libraries are installed, it is still necessary to
-run ::
+once the above python and c libraries are installed, download methylcoder from:
+
+    http://github.com/brentp/methylcode/tarball/master (tar ball)
+
+and untar; or clone the repository via git::
+
+    git clone git://github.com/brentp/methylcode.git
+
+
+Then, from the methylcode directory, it is still necessary to run ::
 
     $ sudo python setup.py install
 
@@ -70,6 +80,8 @@ The input to the pipeline is:
   the reads are to be mapped.
 * a fastq  or fasta reads file. all reads must be the same length and must be
   from Eckers/Zilberman bisulfite process
+  If 2 read files are specified, they are assumed to be pair ends and bowtie is
+  called appropriately.
 
 Output
 ======
@@ -111,14 +123,15 @@ You must have:
 
     1) input reference fasta file to which to align the reads. here: `thaliana_v9.fasta`
     2) a reads file in fastq or fasta format. here: `reads.fastq`.
+       if you have paired end reads, they must be specified in order 1, 2.
     3) a directory containing the bowtie and bowtie-build
        executables. here: in `/usr/local/src/bowtie/`
 
 An example command to run the pipeline is::
 
     $ methylcoder --bowtie=/usr/local/src/bowtie/ \
-                  --reads /path/to/reads.fastq \
-                  --reference /path/to/thaliana_v9.fasta
+                  --reference /path/to/thaliana_v9.fasta \
+                  /path/to/reads.fastq
 
 Where you must adjust `/path/to/reads.fastq` to point to your BS-treated reads.
 This will create the files specified in `Output`_ above, sending the text to
