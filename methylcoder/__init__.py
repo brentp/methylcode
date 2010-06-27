@@ -32,6 +32,8 @@ np.seterr(divide="ignore")
 import version
 __version__ = version.version
 
+def complement(s, _comp=string.maketrans('ATCG', 'TAGC')):
+    return s.translate(_comp)
 def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
     return s.translate(_comp)[::-1]
 
@@ -173,12 +175,12 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
             print >> unmapped, str(raw_fastq)
             continue
 
-        pair_end = line[1] != '0'
-        if pair_end:
+        pair_end = line[1]
+        if pair_end != '0':
             # if the pair doesn't map to same place, skip.
             if line[6] != "=": continue
             # flags are (1 | 2 | 32 | 64) or (1 | 2 | 16 | 128)
-            idx = 0 if pair_end == '99' else 0
+            idx = 0 if pair_end == '99' else 1
             # bowtie prints the alignment without the pair end info.
             # add back /0 or /1 here.
             read_id = read_id + "/" + str(idx + 1)
@@ -214,6 +216,9 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
             line[1] = str(int(line[1]) + 16) # alignment on reverse strand.
             converted_seq = revcomp(converted_fastq.seq)
 
+        if line[1] in ('147', '163'): # th other end of the pair.
+            line[9] = raw_seq = revcomp(raw_seq)
+            converted_seq = revcomp(converted_seq)
         # NM:i:2
         NM = [x for x in line[11:] if x[0] == 'N' and x[1] == 'M'][0].rstrip()
         nmiss = int(NM[-1])
@@ -250,7 +255,14 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
     we take the header and return each record
     """
     IndexEntry = fqidx.entry_class
-    fpos = fqidx.get_position(header)
+    #print >>sys.stderr, header
+    #print >>sys.stderr, fqidx.db.iterkeys().next()
+    try:
+        fpos = fqidx.get_position(header)
+    except TypeError:
+        # strip the /1 or /2 that bowtie adds for paired reads.
+        fpos = fqidx.get_position(header[:-2])
+
     fh_raw_reads.seek(fpos)
     fh_c2t_reads.seek(fpos)
     return IndexEntry(fh_raw_reads), IndexEntry(fh_c2t_reads)
@@ -360,6 +372,18 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths,
                                                       get_records, unmapped_name):
         # read_id is also the line number from the original file.
+        ###############
+        ###############
+        ###############
+        ###############
+        ###############
+        #if direction != 'r': continue
+        #if sam_line[1] != '147': continue
+        ###############
+        ###############
+        ###############
+        ###############
+        ###############
         pairs = "CT" if direction == "f" else "GA" #
         read_id = p['read_id']
         pos0 = p['pos0']
@@ -368,10 +392,12 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
 
         # the position is the line num * the read_id + read_id (where the +
         # is to account for the newlines.
-        genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len])
+        genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len]).upper()
         DEBUG = False
         if DEBUG:
-            araw, ac2t = get_records(read_id)
+            print >>sys.stderr, ">>", sam_line[1]
+            idx = 0 if sam_line[1] in ('99', '115') else 1
+            araw, ac2t = get_records(read_id, idx)
             print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0,
                                                          pos0, read_len)
             #fh_c2t_reads.seek((read_id * read_len) + read_id)
@@ -380,13 +406,16 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
                 c2t = ac2t.seq
-                c2t = revcomp(c2t)
-                assert c2t == p['read_sequence']
+                if sam_line[1] in ('115', '147'):
+                    c2t = revcomp(c2t)
+                assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
 
             else:
                 print >>sys.stderr, "raw_read(f):", raw
                 c2t = ac2t.seq
-                assert c2t == p['read_sequence']
+                if sam_line[1] in ('115', '147'):
+                    c2t = revcomp(c2t)
+                #assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
             print >>sys.stderr, "c2t        :",  c2t, "\n"
 
         # have to keep the ref in forward here to get the correct bp
@@ -509,7 +538,7 @@ def convert_reads_c2t(reads_path, ga=False):
             header = next_line().rstrip('\n')
             if not header: break
 
-            db[header[1:]] = str(pos)
+            db[header[1:].split()[0]] = str(pos)
             seq = next_line()
             out.write(header + '\n')
             if ga:
