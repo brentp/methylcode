@@ -127,7 +127,7 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
     # single end reads
     if len(reads_list_c2t) == 1:
         cmd +=" --best %s" % reads_list_c2t[0]
-    else:
+    else: # paired end reads.
         cmd += " -1 %s -2 %s" % tuple(reads_list_c2t)
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
@@ -478,7 +478,7 @@ $SAMTOOLS index %(odir)s/methylcoded.bam
     """ % dict(odir=out_dir, fapath=fasta.fasta_name)
     out.close()
 
-def convert_reads_c2t(reads_path):
+def convert_reads_c2t(reads_path, ga=False):
     """
     assumes all capitals returns the new path and creates and index.
     """
@@ -512,7 +512,10 @@ def convert_reads_c2t(reads_path):
             db[header[1:]] = str(pos)
             seq = next_line()
             out.write(header + '\n')
-            out.write(seq.replace('C', 'T'))
+            if ga:
+                out.write(seq.replace('G', 'A'))
+            else:
+                out.write(seq.replace('C', 'T'))
             for i in lines: out.write(next_line())
 
         out.close()
@@ -602,8 +605,10 @@ def main():
 
     IndexClass = None
     c2t_reads_list = []
-    for read_path in read_paths:
-        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_path)
+    for i, read_path in enumerate(read_paths):
+        # if i is 0 we dont convert ga
+        # if it is 1, it's the other pair, so ga it.
+        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_path, ga=bool(i))
         IndexClass = c2t_reads_index.__class__
         c2t_reads_list.append(c2t_reads_path)
 
