@@ -261,7 +261,11 @@ def get_raw_and_c2t(header, fqidx, fh_raw_reads, fh_c2t_reads):
         fpos = fqidx.get_position(header)
     except TypeError:
         # strip the /1 or /2 that bowtie adds for paired reads.
-        fpos = fqidx.get_position(header[:-2])
+        try:
+            fpos = fqidx.get_position(header[:-2])
+        except:
+            # sometimes bowtie takes only the part before the space.
+            fpos = fqidx.get_position(header.split()[0])
 
     fh_raw_reads.seek(fpos)
     fh_c2t_reads.seek(fpos)
