@@ -161,26 +161,26 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
         # it was excluded because of -M
         line = sline.split("\t")
         read_id = line[0]
+        sam_flag = int(line[1])
         # no reported alignments.
         # extra via -m
-        if line[1] == '4':
+        if sam_flag == 4:
             if not "XM:i:0" in sline:
                 # write stuff that was excluded because of too many mappings.
                 raw_fastq, converted_fastq = get_records(read_id, 0)
                 print >> unmapped, str(raw_fastq)
             continue
         # extra found via -M
-        if line[4] == '0' and line[1] == '0':
+        if line[4] == '0' and sam_flag == 0:
             raw_fastq, converted_fastq = get_records(read_id, 0)
             print >> unmapped, str(raw_fastq)
             continue
 
-        pair_end = line[1]
-        if pair_end != '0':
+        if sam_flag != 0:
             # if the pair doesn't map to same place, skip.
             if line[6] != "=": continue
             # flags are (1 | 2 | 32 | 64) or (1 | 2 | 16 | 128)
-            idx = 0 if pair_end == '99' else 1
+            idx = 0 if (sam_flag & 128) == 0 else 1
             # bowtie prints the alignment without the pair end info.
             # add back /0 or /1 here.
             read_id = read_id + "/" + str(idx + 1)
@@ -213,10 +213,10 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
             line[9] = raw_seq = revcomp(raw_seq)
             # flip the quality as well.
             line[10] = line[10][::-1]
-            line[1] = str(int(line[1]) + 16) # alignment on reverse strand.
+            line[1] = str(sam_flag + 16) # alignment on reverse strand.
             converted_seq = revcomp(converted_fastq.seq)
 
-        if line[1] in ('147', '163'): # th other end of the pair.
+        if (sam_flag & 128 != 0): # th other end of the pair.
             line[9] = raw_seq = revcomp(raw_seq)
             converted_seq = revcomp(converted_seq)
         # NM:i:2
@@ -393,33 +393,34 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
         pos0 = p['pos0']
         align_count += 1
         raw = p['raw_read']
+        sam_flag = int(sam_line[1])
 
         # the position is the line num * the read_id + read_id (where the +
         # is to account for the newlines.
         genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len]).upper()
         DEBUG = False
         if DEBUG:
-            print >>sys.stderr, ">>", sam_line[1]
-            idx = 0 if sam_line[1] in ('99', '115') else 1
+            print >>sys.stderr, ">>", sam_line[1], sam_flag
+            idx = 0 if (sam_flag & 128) == 0 else 1
             araw, ac2t = get_records(read_id, idx)
             print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0,
                                                          pos0, read_len)
-            #fh_c2t_reads.seek((read_id * read_len) + read_id)
             print >>sys.stderr, "mismatches:", p['nmiss']
             print >>sys.stderr, "ref        :", genomic_ref
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
                 c2t = ac2t.seq
-                if sam_line[1] in ('115', '147'):
+                if (sam_flag & 128) == 0:
                     c2t = revcomp(c2t)
                 assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
 
             else:
                 print >>sys.stderr, "raw_read(f):", raw
                 c2t = ac2t.seq
-                if sam_line[1] in ('115', '147'):
+                if (sam_flag & 128) != 0:
                     c2t = revcomp(c2t)
-                #assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
+                    p['read_sequence'] = revcomp(p['read_sequence'])
+                assert c2t == p['read_sequence'], (c2t, p['read_sequence'], sam_flag)
             print >>sys.stderr, "c2t        :",  c2t, "\n"
 
         # have to keep the ref in forward here to get the correct bp
