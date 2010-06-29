@@ -6,7 +6,11 @@ import os.path as op
 import sys
 sys.path.insert(0, op.dirname(__file__))
 
-import methylcoder.version as V
+try:
+    import methylcoder.version as V
+except ImportError:
+    class V(object):
+        version = 0.0
 
 ext_modules = [ Extension("methylcoder/cbowtie",
                 sources=["methylcoder/cbowtie.c"],
