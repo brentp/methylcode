@@ -598,6 +598,8 @@ def main():
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
+    p.add_option("--gsnap", dest="gsnap", help="path to gsnap directory"
+                " must contain src/ and util/ subdirectories")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
     p.add_option("--unconverted", dest="unconverted", action="store_true",
@@ -620,13 +622,19 @@ def main():
 
     opts, read_paths = p.parse_args()
 
-    if not (len(read_paths) in (1, 2) and opts.bowtie):
+    if not (len(read_paths) in (1, 2) and (opts.bowtie or opts.gsnap)):
         sys.exit(p.print_help())
 
     unconverted = opts.unconverted and len(read_paths) == 1
 
     out_dir = opts.out_dir = get_out_dir(opts.out_dir, read_paths)
     fasta = get_fasta(opts)
+
+    if opts.gsnap:
+        import gsnap
+        gsnap.main(out_dir, fasta, read_paths, opts.gsnap)
+        sys.exit()
+
 
     fr_c2t, fr_unc = write_c2t(fasta, unconverted)
 
