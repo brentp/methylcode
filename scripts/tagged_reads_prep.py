@@ -3,7 +3,7 @@ convert bisulfite treated reads generated with Cokus protocol to format suitable
 
 %prog [options] > newfile.fastq
 
-then newfile.fastq is suitable to send to methylcode.py
+then newfile.fastq is suitable to send to methylcoder
 """
 import sys
 from pyfasta import complement
@@ -21,6 +21,7 @@ def gen_record_from_fastq(reads):
     rl = fh.readline
     while True:
         header = rl().strip()
+        if not header: break
         assert header[0] == "@"
         yield [header, rl().strip(), rl().strip(), rl().strip()]
 
@@ -42,6 +43,12 @@ def main(reads, tags, fmt):
             record[1] = seq
             record[3] = record[3][-len(seq):][::-1] # strip the stuff for tags.
         print "\n".join(record)
+        """
+        if not tags:
+            record[0] += "r"
+            record[3] = complement(record[3])[::-1]
+            print "\n".join(record)
+        """
 
 if __name__ == "__main__":
     import optparse
