@@ -51,6 +51,7 @@ C
 -
 
 * `bowtie`_ to align the reads to the genome.
+* (optional) `gsnap`_ alternative aligner. (part of gmap).
 * (optional) `sam-tools`_ to view the alignments and processing the reads
 
 Installation
@@ -79,8 +80,9 @@ The input to the pipeline is:
 * a reference fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped.
 * a fastq  or fasta reads file. all reads must be the same length and must be
-  from Eckers/Zilberman bisulfite process
-  If 2 read files are specified, they are assumed to be pair ends and bowtie is
+  from Eckers/Zilberman bisulfite process if bowtie is used. May be from the other
+  protocol if --gsnap is specified.
+  If 2 read files are specified, they are assumed to be pair ends and the aligner is
   called appropriately.
 
 Output
@@ -124,14 +126,22 @@ You must have:
     1) input reference fasta file to which to align the reads. here: `thaliana_v9.fasta`
     2) a reads file in fastq or fasta format. here: `reads.fastq`.
        if you have paired end reads, they must be specified in order 1, 2.
-    3) a directory containing the bowtie and bowtie-build
-       executables. here: in `/usr/local/src/bowtie/`
+    3) a directory containing the bowtie and bowtie-build executables.
+       (or the path to the gmap/gsnap source directory containing util/ and
+       src/ dirs)
 
 An example command to run the pipeline is::
 
-    $ methylcoder --bowtie=/usr/local/src/bowtie/ \
+    $ methylcoder --bowtie /usr/local/src/bowtie/ \
+                  --bowtie_args "-m 1"
                   --reference /path/to/thaliana_v9.fasta \
                   /path/to/reads.fastq
+
+or using the gsnap aligner on paired-end reads.::
+
+    $ methylcoder --gsnap /usr/local/src/gmap/gmap-2010-03-09/ \
+                  --reference /path/to/thaliana_v9.fasta \
+                  /path/to/reads_1.fastq /path/to/reads_2.fastq
 
 Where you must adjust `/path/to/reads.fastq` to point to your BS-treated reads.
 This will create the files specified in `Output`_ above, sending the text to
@@ -150,7 +160,8 @@ Additional args can be sent directly to bowtie as a string to methylcoder.py's
     --bowtie_args "--solexa-quals -k 1 -m 1 --strata"
 
 and that string will be passed directly to the bowtie invocation when it is
-called from methylcoder.
+called from methylcoder. Whenever 2 fastq files are sent, they are assumed
+to be paired-end reads.
 
 
 Analysis/Visualization
@@ -164,19 +175,18 @@ Reading
   http://www.nature.com/nature/journal/v462/n7271/extref/nature08514-s1.pdf
 
 * Bowtie Paper:
-  Langmead B, Trapnell C, Pop M, Salzberg SL. Ultrafast and memory-efficient
+  Langmead B, Trapnell C, Pop M, Salzberg SL. 2009. Ultrafast and memory-efficient
   alignment of short DNA sequences to the human genome. Genome Biol 10:R25.
+
+* GSNAP paper:
+  Wu TD, Nacu S. 2010 Fast and SNP-tolerant detection of complex variants and splicing in short reads.
+  Bioinformatics. 26(7):873-81.
 
 Notes
 =====
 
 **warning**
-methylcoder assumes that the Bisulfite converted reads are created
-using the Zilberman/Ecker method in which BS conversion occurs *after*
-conversion to solexa library--giving only 2 possibibilities. This is in
-contrast to the Jacobsen method which gives 4 possiblities. (The code in
-methylcoder.py could be made to handle the 2 additional possiblities but
-does not do so currently)
+when run with bowtie, methylcoder assumes that the Bisulfite converted reads are created using the Zilberman/Ecker method in which BS conversion occurs *after* conversion to solexa library--giving only 2 possibibilities. This is in contrast to the Jacobsen method which gives 4 possiblities. When run with gsnap, it is assumed that the Jacobsen method was used.
 
 .. _`cython`: http://cython.org
 .. _`numpy`: http://numpy.scipy.org
@@ -185,3 +195,4 @@ does not do so currently)
 .. _`bowtie`: http://bowtie-bio.sourceforge.net/index.shtml
 .. _`sam-tools`: http://samtools.sourceforge.net/
 .. _`Fischer Lab`: http://epmb.berkeley.edu/facPage/dispFP.php?I=8
+.. _`gsnap`: http://research-pub.gene.com/gmap/
