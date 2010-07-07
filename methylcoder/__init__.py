@@ -130,6 +130,7 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
     if len(reads_list_c2t) == 1:
         cmd +=" --best %s" % reads_list_c2t[0]
     else: # paired end reads.
+        assert len(reads_list_c2t) == 2, reads_list_c2t
         cmd += " -1 %s -2 %s" % tuple(reads_list_c2t)
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
@@ -662,8 +663,8 @@ def main():
         sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.bowtie_args, bowtie_reads_flag)
         counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches)
         if unconverted and len(c2t_reads_list) == 1:
-            sam = run_bowtie(opts, ref_base, unmatched, opts.bowtie_args, bowtie_reads_flag)
-            counts, _ = count_conversions(fasta, sam, unmatched, unmatched,  IndexClass,
+            sam = run_bowtie(opts, ref_base, (unmatched, ), opts.bowtie_args, bowtie_reads_flag)
+            counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts)
         write_files(fasta, opts.out_dir, counts)
     except:
