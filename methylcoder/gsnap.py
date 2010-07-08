@@ -103,6 +103,9 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
     fc, ft, fmethyltype = \
             bin_paths_from_fasta(fa.fasta_name, out_dir)
     counts = get_counts(fc, ft, fa)
+    chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
+
+
     print >>sys.stderr, "tabulating methylation"
 
     for sline in open(gsnap_f):
@@ -119,15 +122,17 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
         seqid = line[2]
         sam_flag = int(line[1])
         aln_seq = line[9]
-        bp0 = int(line[3])
-        end = int(line[7])
-        bp1 = bp0 + len(aln_seq) - 1
+        bp0 = int(line[3]) - 1
+        bp1 = bp0 + len(aln_seq)
         ga = ((sam_flag & 16) != 0) ^ (sam_flag & 128 != 0)
+        ref_seq = (fa[seqid][bp0:bp1]).upper()
 
-        ref_seq = (fa[seqid][bp0 - 1:bp1]).upper()
         letters = 'GA' if ga else 'CT'
+        read_len = len(ref_seq)
+        _update_conversions(ref_seq, aln_seq, bp0, letters,
+                            counts[seqid]['c'], counts[seqid]['t'],
+                            50, read_len)
 
-        _update_conversions(ref_seq, aln_seq, bp0, letters, counts[seqid]['c'], counts[seqid]['t'], 5, len(ref_seq))
     write_files(fa.fasta_name, out_dir, counts)
 
 def main(out_dir, ref_fasta, reads, gsnap_path):

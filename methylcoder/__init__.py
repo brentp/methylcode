@@ -493,6 +493,7 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     idxs, = np.where(cs + ts)
     for bp, mt, c, t in np.column_stack((idxs, methylation_type[idxs],
                                            cs[idxs], ts[idxs])):
+        assert mt > 0, (seqid, mt, bp, c, t)
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
 def write_sam_commands(out_dir, fasta):
@@ -635,7 +636,6 @@ def main():
         import gsnap
         gsnap.main(out_dir, fasta, read_paths, opts.gsnap)
         sys.exit()
-
 
     fr_c2t, fr_unc = write_c2t(fasta, unconverted)
 
