@@ -528,7 +528,7 @@ def convert_reads_c2t(reads_path, ga=False):
     idx = c2t + IndexClass.ext
 
     if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx):
-        return c2t, IndexClass(c2t)
+        return c2t, IndexClass
 
     print >>sys.stderr, "converting C to T in %s" % (reads_path)
 
@@ -562,7 +562,7 @@ def convert_reads_c2t(reads_path, ga=False):
         os.unlink(c2t)
         os.unlink(idx)
         raise
-    return c2t, IndexClass(c2t)
+    return c2t, IndexClass
 
 def get_fasta(opts):
     "all the stuff to get the fasta from cmd line in single spot"
@@ -603,13 +603,12 @@ def get_index_and_c2t(read_paths):
     IndexClass = None
     c2t_reads_list = []
     if len(read_paths) == 1:
-        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_paths[0], ga=False)
+        c2t_reads_path, IndexClass = convert_reads_c2t(read_paths[0], ga=False)
         c2t_reads_list = [c2t_reads_path]
-        IndexClass = c2t_reads_index.__class__
     else:
         pool = processing.Pool(2)
         results = pool.map(_mapper, [(read_paths[0], False), (read_paths[1], True)])
-        IndexClass = results[0][1].__class__
+        IndexClass = results[0][1]
         c2t_reads_list = [r[0] for r in results]
     return IndexClass, c2t_reads_list
 
