@@ -8,8 +8,9 @@ treated reads. usage:
 
     methylcoder [options] reads1.fastq reads2.fastq
 
-any arguments to bowtie should be sent as a string via --bowtie_args.
-e.g. --bowtie_args "--phred64-quals -m 1 --fr "
+extra arguments to the aligner (bowtie or gmap/gsnap) should be sent as a string via 
+    --extra-args.
+e.g. --extra-args "--phred64-quals -m 1 --fr "
 
 NOTE: it is highly recommended to use -m 1 to ensure unique mappings.
 
@@ -39,8 +40,8 @@ def revcomp(s, _comp=string.maketrans('ATCG', 'TAGC')):
 
 CPU_COUNT = 4
 try:
-    import multiprocessing
-    CPU_COUNT = multiprocessing.cpu_count()
+    import multiprocessing as processing
+    CPU_COUNT = processing.cpu_count()
 except ImportError:
     import processing
     CPU_COUNT = processing.cpuCount()
@@ -594,6 +595,25 @@ def make_header():
 #from: %s
 #version: %s""" % (" ".join(sys.argv), datetime.date.today(),
                    op.abspath("."), __version__)
+def _mapper(args):
+    """used to parallelize convert_reads_c2t"""
+    return convert_reads_c2t(*args)
+
+def get_index_and_c2t(read_paths):
+    IndexClass = None
+    c2t_reads_list = []
+    if len(read_paths) == 1:
+        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_paths[0], ga=False)
+        c2t_reads_list = [c2t_reads_path]
+        IndexClass = c2t_reads_index.__class__
+    else:
+        pool = processing.Pool(2)
+        results = pool.map(_mapper, [(read_paths[0], False), (read_paths[1], True)])
+        IndexClass = results[0][1].__class__
+        c2t_reads_list = [r[0] for r in results]
+    return IndexClass, c2t_reads_list
+
+
 
 def main():
     import optparse
@@ -609,15 +629,15 @@ def main():
                  "unconverted genome in addtion to mapping c2t reads against"
                  " c2t genome. only works for un-paired reads.")
 
-    p.add_option("--bowtie_args", dest="bowtie_args", default="",
+    p.add_option("--extra-args", dest="extra_args", default="",
                  help="any extra arguments to pass directly to bowtie. must "
                  " be specified inside a string. e.g.: "
-                 "--bowtie_args '--strata --solexa-quals'")
+                 "--extra-args '--strata --solexa-quals'")
 
     p.add_option("--mismatches", dest="mismatches", type="int", default=0,
              help="number of mismatches allowed. NOT sent to bowtie executable"
                 " used to improve mapping accuracy after seeing reads aligned"
-                " with original genome. use bowtie_args to send to bowtie."
+                " with original genome. use extra-args to send to bowtie."
                 " default: %default")
     p.add_option("--reference", dest="reference",
              help="path to reference fasta file to which to align reads")
@@ -634,7 +654,7 @@ def main():
 
     if opts.gsnap:
         import gsnap
-        gsnap.main(out_dir, fasta, read_paths, opts.gsnap)
+        gsnap.main(out_dir, fasta, read_paths, opts.gsnap, opts.extra_args)
         sys.exit()
 
     fr_c2t, fr_unc = write_c2t(fasta, unconverted)
@@ -646,24 +666,25 @@ def main():
     if punc:
         if punc.wait() != 0: sys.exit(1)
 
-    IndexClass = None
-    c2t_reads_list = []
+    IndexClass, c2t_reads_list = get_index_and_c2t(read_paths)
+
+    """
     for i, read_path in enumerate(read_paths):
         # if i is 0 we dont convert ga
         # if it is 1, it's the other pair, so ga it.
         c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_path, ga=bool(i))
         IndexClass = c2t_reads_index.__class__
         c2t_reads_list.append(c2t_reads_path)
-
+    """
 
     ref_base = op.splitext(fr_c2t)[0]
 
     try:
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
-        sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.bowtie_args, bowtie_reads_flag)
+        sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.extra_args, bowtie_reads_flag)
         counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches)
         if unconverted and len(c2t_reads_list) == 1:
-            sam = run_bowtie(opts, ref_base, (unmatched, ), opts.bowtie_args, bowtie_reads_flag)
+            sam = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
             counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts)
         write_files(fasta, opts.out_dir, counts)

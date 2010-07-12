@@ -133,7 +133,7 @@ You must have:
 An example command to run the pipeline is::
 
     $ methylcoder --bowtie /usr/local/src/bowtie/ \
-                  --bowtie_args "-m 1"
+                  --extra-args "-m 1"
                   --reference /path/to/thaliana_v9.fasta \
                   /path/to/reads.fastq
 
@@ -154,10 +154,10 @@ modified since it was run last. *NOTE* if the `methylcoder` executable is
 called without any options, it will print help and available command-line
 arguments.
 
-Additional args can be sent directly to bowtie as a string to methylcoder.py's
---bowtie_args parameter. This would look like. ::
+Additional args can be sent directly to the aligner as a string to methylcoder.py's
+--extra-args parameter. This would look like. ::
 
-    --bowtie_args "--solexa-quals -k 1 -m 1 --strata"
+    --extra-args "--solexa-quals -k 1 -m 1 --strata"
 
 and that string will be passed directly to the bowtie invocation when it is
 called from methylcoder. Whenever 2 fastq files are sent, they are assumed

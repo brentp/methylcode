@@ -19,7 +19,7 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
     cmd += " -D %(out_dir)s -o %(make_path)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_setup.log && "
     cmd += "\n make -f %(make_path)s coords > gmap_coords.log && "
     cmd += "\n make -f %(make_path)s gmapdb > gmap_gmapdb.log &&"
-    cmd += "\n %(gsnap_dir)s/src/cmetindex -d %(ref_name)s -D %(out_dir)s > gmap_cmetindex.log"
+    cmd += "\n %(gsnap_dir)s/src/cmetindex -d %(ref_name)s -D %(out_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
@@ -43,7 +43,7 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
         print >>sys.stderr, "^ NOT executing gmap/gsnap setup. everything is up to date.^"
     return ref_base
 
-def run_gsnap(gsnap_dir, out_dir, ref_fasta, reads_fasta, cpu_count):
+def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count):
     #/opt/src/gmap/gmap-2010-03-09/src/gsnap --npaths 1 --quiet-if-excessive -A sam --nofails --nthreads 4 -D ./ -d hg19e_gmap --cmet bs_reads.fasta > bs.align.sam
     ref_base = op.splitext(ref_fasta)[0]
     ref_name = op.basename(ref_base)
@@ -51,8 +51,8 @@ def run_gsnap(gsnap_dir, out_dir, ref_fasta, reads_fasta, cpu_count):
     log = op.join(out_dir, "gsnap_run.log")
 
     out_sam = op.abspath(op.join(out_dir, "methylcoder.gnsap.sam"))
-    cmd = "%(gsnap_dir)s/src/gsnap --npaths 1 --quiet-if-excessive -A sam "
-    cmd += " --nofails --nthreads %(cpu_count)i -D %(out_dir)s"
+    cmd = "%(gsnap_dir)s/src/gsnap --npaths 1 --quiet-if-excessive -A sam"
+    cmd += " --nofails --nthreads %(cpu_count)i -D %(out_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s --cmet %(reads_fasta)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
@@ -135,10 +135,10 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
 
     write_files(fa.fasta_name, out_dir, counts)
 
-def main(out_dir, ref_fasta, reads, gsnap_path):
+def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
     bsnap_fasta = fastq_to_gsnap_fasta(out_dir, reads)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
-    gsnap_sam = run_gsnap(gsnap_path, out_dir, ref_fasta, bsnap_fasta, cpu_count=CPU_COUNT - 1)
+    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, bsnap_fasta, cpu_count=CPU_COUNT - 1)
     paired_end = len(reads) > 1
 
     parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end)
