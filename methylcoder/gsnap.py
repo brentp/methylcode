@@ -56,7 +56,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count)
     cmd += " -d %(ref_name)s --cmet %(reads_fasta)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
-    if not (op.exists(cmd_path) and open(cmd_path).read().strip() == cmd):
+    if not (op.exists(cmd_path) and open(cmd_path).read().strip() == cmd.strip()):
         fh = open(cmd_path, "w")
         print >>fh, cmd
         fh.close()
@@ -64,6 +64,9 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count)
     if is_up_to_date_b(reads_fasta, out_sam) and is_up_to_date_b(reads_fasta, cmd_path):
         print >>sys.stderr, "^ NOT executing gsnap. everything is up to date.^"
     else:
+        fh = open(cmd_path, "w")
+        print >>fh, cmd
+        fh.close()
         print >>sys.stderr, "^ executing gsnap. ^"
         p = Popen(cmd.replace('\n', ' '), shell=True)
         p.wait()
