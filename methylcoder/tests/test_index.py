@@ -10,8 +10,8 @@ DATA = op.join(PATH, "data")
 
 class GuesserTest(unittest.TestCase):
     def setUp(self):
-        self.fastq = op.join(DATA, "sample.fastq")
-        self.fasta = op.join(DATA, "sample.fasta")
+        self.fastq = op.join(DATA, "sample.fastq.test")
+        self.fasta = op.join(DATA, "sample.fasta.test")
 
     def test_fastq(self):
         self.assertEquals(FastQIndex, guess_index_class(self.fastq))
@@ -24,18 +24,11 @@ class GuesserTest(unittest.TestCase):
 
 
 class FastQIndexTest(unittest.TestCase):
-    nsub = 1000
-    base_file = "sample.fastq"
+    base_file = "sample.fastq.test"
     klass = FastQIndex
     header_start = "@"
     def setUp(self):
-        self.base_path = op.join(DATA, self.base_file)
-        self.path = self.base_path + ".test"
-        fh = open(self.path, "w")
-        for i, line in enumerate(open(self.base_path)):
-            if i == self.nsub: break
-            print >>fh, line.rstrip("\n")
-        fh.close()
+        self.path = op.join(DATA, self.base_file)
         self.idx_path = self.path + self.klass.ext
 
     def test_create(self):
@@ -53,7 +46,7 @@ class FastQIndexTest(unittest.TestCase):
         for header in (line.strip() for line in open(self.path) \
                                        if line[0] == self.header_start):
 
-            self.assert_(header in fi, (header, fi.iterkeys().next()))
+            self.assert_(header[1:] in fi, (header, fi.iterkeys().next()))
 
     def test_sequence(self):
         fi = self.klass(self.path)
@@ -67,11 +60,10 @@ class FastQIndexTest(unittest.TestCase):
 
     def tearDown(self):
         os.unlink(self.idx_path)
-        os.unlink(self.path)
 
 
 class FastaIndexTest(FastQIndexTest):
-    base_file = "sample.fasta"
+    base_file = "sample.fasta.test"
     klass = FastaIndex
     header_start = ">"
 
