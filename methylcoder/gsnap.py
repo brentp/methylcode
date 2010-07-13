@@ -7,19 +7,18 @@ from pyfasta import Fasta
 
 # /opt/src/gmap/gmap-2010-03-09/util/gmap_setup -D ../ -d hg19e_gmap  ../hg19e.f
 def gmap_setup(gsnap_dir, out_dir, ref_fasta):
-    ref_fasta  = op.abspath(ref_fasta)
     ref_base = op.splitext(ref_fasta)[0]
+    ref_dir = op.dirname(ref_fasta)
     ref_name = op.basename(ref_base)
-    make_path = "Makefile.%(ref_name)s" % locals()
+    make_path = "%(out_dir)s/Makefile.%(ref_name)s" % locals()
     gsnap_setup = op.join(gsnap_dir, "util", "gmap_setup")
-    out_dir = op.abspath(out_dir)
     # have to cd to the out_dir because gsnap writes to cwd.
-    cmd = "\n cd %(out_dir)s && \n"
+    cmd = "\n cd %(ref_dir)s && \n"
     cmd += gsnap_setup
-    cmd += " -D %(out_dir)s -o %(make_path)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_setup.log && "
+    cmd += " -D %(ref_dir)s -o %(make_path)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_setup.log && "
     cmd += "\n make -f %(make_path)s coords > gmap_coords.log && "
     cmd += "\n make -f %(make_path)s gmapdb > gmap_gmapdb.log &&"
-    cmd += "\n %(gsnap_dir)s/src/cmetindex -d %(ref_name)s -D %(out_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
+    cmd += "\n %(gsnap_dir)s/src/cmetindex -d %(ref_name)s -D %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
@@ -47,12 +46,13 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count)
     #/opt/src/gmap/gmap-2010-03-09/src/gsnap --npaths 1 --quiet-if-excessive -A sam --nofails --nthreads 4 -D ./ -d hg19e_gmap --cmet bs_reads.fasta > bs.align.sam
     ref_base = op.splitext(ref_fasta)[0]
     ref_name = op.basename(ref_base)
+    ref_dir = op.dirname(ref_fasta)
     reads_fasta = op.abspath(reads_fasta)
     log = op.join(out_dir, "gsnap_run.log")
 
     out_sam = op.abspath(op.join(out_dir, "methylcoder.gnsap.sam"))
     cmd = "%(gsnap_dir)s/src/gsnap --npaths 1 --quiet-if-excessive -A sam"
-    cmd += " --nofails --nthreads %(cpu_count)i -D %(out_dir)s %(gsnap_args)s"
+    cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s --cmet %(reads_fasta)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
@@ -139,7 +139,7 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
         print >>sys.stderr, "using existing fasta"
     else:
         out_fa = open(fa_name, "w")
-        fastx_to_gsnap_fasta(out_fa, reads)
+        fastx_to_gsnap_fasta(reads, out_fa)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
     gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, fa_name, cpu_count=CPU_COUNT - 1)
     paired_end = len(reads) > 1
