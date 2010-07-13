@@ -160,7 +160,6 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
     for sline in open(sam_aln_file):
         # comment.
         if sline[0] == "@": continue
-        # it was excluded because of -M
         line = sline.split("\t")
         read_id = line[0]
         sam_flag = int(line[1])
@@ -569,6 +568,7 @@ def get_fasta(opts):
     fasta = opts.reference
     if fasta is None:
         raise Exception("must specify path to fasta file")
+    fasta = op.abspath(fasta)
     assert os.path.exists(fasta), "fasta: %s does not exist" % fasta
     if glob.glob("%s/*.bin" % opts.out_dir):
         cmd = raw_input("""%s already contains .bin files. do you want to:
@@ -582,7 +582,7 @@ def get_fasta(opts):
     return fasta
 
 def get_out_dir(out_dir, reads):
-    out_dir = out_dir or op.splitext(reads[0])[0] + "_methylcoder"
+    out_dir = op.abspath(out_dir or op.splitext(reads[0])[0] + "_methylcoder")
     if not op.exists(out_dir):
         os.makedirs(out_dir)
     print >>sys.stderr, "using %s for writing output" % out_dir
@@ -650,12 +650,14 @@ def main():
 
     out_dir = opts.out_dir = get_out_dir(opts.out_dir, read_paths)
     fasta = get_fasta(opts)
+    reads_paths = [op.abspath(r) for r in read_paths]
 
     if opts.gsnap:
         import gsnap
-        gsnap.main(out_dir, fasta, read_paths, opts.gsnap, opts.extra_args)
+        gsnap.main(out_dir, fasta, read_paths, op.abspath(opts.gsnap), opts.extra_args)
         sys.exit()
 
+    opts.bowtie = op.abspath(opts.bowtie)
     fr_c2t, fr_unc = write_c2t(fasta, unconverted)
 
     pc2t = run_bowtie_builder(opts.bowtie, fr_c2t)
@@ -666,15 +668,6 @@ def main():
         if punc.wait() != 0: sys.exit(1)
 
     IndexClass, c2t_reads_list = get_index_and_c2t(read_paths)
-
-    """
-    for i, read_path in enumerate(read_paths):
-        # if i is 0 we dont convert ga
-        # if it is 1, it's the other pair, so ga it.
-        c2t_reads_path, c2t_reads_index = convert_reads_c2t(read_path, ga=bool(i))
-        IndexClass = c2t_reads_index.__class__
-        c2t_reads_list.append(c2t_reads_path)
-    """
 
     ref_base = op.splitext(fr_c2t)[0]
 
