@@ -69,8 +69,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count)
         p.wait()
     return out_sam
 
-def fastx_to_gsnap_fasta(fa_name, reads):
-    out_fa = open(fa_name, "w")
+def fastx_to_gsnap_fasta(reads, out_fa=sys.stdout):
 
     fh1 = open(reads[0])
     fh2 = open(reads[1]) if len(reads) > 1 else None
@@ -94,7 +93,7 @@ def fastx_to_gsnap_fasta(fa_name, reads):
             print >>out_fa, seq2,
             if header1[0] == "@":
                 read2(); read2()
-    return fa_name
+    return out_fa.name
 
 def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
     fa = Fasta(ref_path)
@@ -139,7 +138,8 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
     if all(is_up_to_date_b(r, fa_name) for r in reads):
         print >>sys.stderr, "using existing fasta"
     else:
-        fastx_to_gsnap_fasta(fa_name, reads)
+        out_fa = open(fa_name, "w")
+        fastx_to_gsnap_fasta(out_fa, reads)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
     gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, fa_name, cpu_count=CPU_COUNT - 1)
     paired_end = len(reads) > 1
@@ -152,15 +152,14 @@ if __name__ == "__main__":
 convert fastq or fasta files, (paired-end or single) to fasta format used by gsnap.
 
       paired end fastq usage:
-            %prog --fasta some.fasta pair_1.fastq pair_2.fastq
+            %prog pair_1.fastq pair_2.fastq > some.fasta
 
       paired end fasta usage:
-            %prog --fasta some.fasta pair_1.fasta pair_2.fasta
+            %prog --fasta pair_1.fasta pair_2.fasta > gsnap.fasta
 
       single end fastq usage:
-            %prog --fasta some.fasta reads.fastq""")
-    p.add_option("--fasta", dest="fasta", help="fasta file to write")
+            %prog reads.fastq > gsnap.reads.fasta""")
     opts, reads = p.parse_args()
-    if not (opts.fasta and len(reads) in (1, 2)):
+    if not len(reads) in (1, 2):
         sys.exit(p.print_help())
-    fastx_to_gsnap_fasta(p.fasta, reads)
+    fastx_to_gsnap_fasta(reads)
