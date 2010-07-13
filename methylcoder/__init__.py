@@ -284,7 +284,7 @@ def methylation_summary(cs, ts, mt):
         m[context]['methylation'] = css / float(css + tss)
     return m
 
-def print_genome_summary(summary_counts):
+def print_genome_summary(summary_counts, out):
     """
     like print_summary() except does the genome-wide averages"
     """
@@ -298,9 +298,10 @@ def print_genome_summary(summary_counts):
         genome_dict['total_cs'] += d['cs']
         genome_dict['total_ts'] += d['ts']
 
+    print >>out, print_summary.format % genome_dict
     print >>sys.stderr, print_summary.format % genome_dict
 
-def print_summary(seqid, cs, ts, mtype, summary_counts, print_header=False):
+def print_summary(seqid, cs, ts, mtype, summary_counts, out, print_header=False):
     ms = methylation_summary(cs, ts, mtype)
     if print_header:
         header = print_summary.format.replace("-12i", "-12s").replace(".6f", "8s")
@@ -317,6 +318,8 @@ def print_summary(seqid, cs, ts, mtype, summary_counts, print_header=False):
         summary_counts[context]['ts'] += ms[context]['ts']
         #summary += (" %s: %.4f" % (context, ms[context]['methylation']))
 
+    print >>out, "#", " ".join(sys.argv)
+    print >>out, print_summary.format % d
     print >>sys.stderr, print_summary.format % d
 print_summary.format = "%(seqid)-12s %(total_cs)-12i %(total_ts)-12i %(CG)-.6f %(CG_cs)-12i %(CG_ts)-12i %(CHG)-.6f %(CHG_cs)-12i %(CHG_ts)-12i %(CHH)-.6f %(CHH_cs)-12i %(CHH_ts)-12i "
 
@@ -462,11 +465,13 @@ def write_files(original_fasta, out_dir, counts):
     print >>out, "#seqid\tmt\tbp\tc\tt"
 
     f_pat = bin_paths_from_fasta(original_fasta, out_dir, pattern_only=True)
-    print >>sys.stderr, "#> writing:", f_pat
+    f_summary = open(op.join(out_dir, "summary.txt"), "w")
+    print >>sys.stderr, "#> writing:", f_pat, f_summary.name
 
     summary_counts = dict.fromkeys(('CHG', 'CHH', 'CG'))
     for ctx in summary_counts.keys():
         summary_counts[ctx] = {'cs': 0, 'ts': 0}
+
 
     for i, seqid in enumerate(sorted(counts.keys())):
         cs = counts[seqid]['c']
@@ -475,7 +480,7 @@ def write_files(original_fasta, out_dir, counts):
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
 
-        print_summary(seqid, cs, ts, mtype, summary_counts, print_header=(i==0))
+        print_summary(seqid, cs, ts, mtype, summary_counts, f_summary, print_header=(i==0))
 
         cs.tofile(fc % seqid)
         ts.tofile(ft % seqid)
@@ -483,7 +488,7 @@ def write_files(original_fasta, out_dir, counts):
 
         to_text_file(cs, ts, mtype, seqid, out)
 
-    print_genome_summary(summary_counts)
+    print_genome_summary(summary_counts, f_summary)
 
 def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     """
@@ -675,7 +680,7 @@ def main():
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
         sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.extra_args, bowtie_reads_flag)
         counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches)
-        if unconverted and len(c2t_reads_list) == 1:
+        if unconverted and len(c2t_reads_list) == 1 and sum(1 for _ in open(unmatched)) != 0:
             sam = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
             counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts)
