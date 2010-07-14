@@ -141,8 +141,13 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
     if all(is_up_to_date_b(r, fa_name) for r in reads):
         print >>sys.stderr, "using existing fasta"
     else:
-        out_fa = open(fa_name, "w")
-        fastx_to_gsnap_fasta(reads, out_fa)
+        if len(reads) > 1 or open(reads[0]).readline()[0] != ">":
+            out_fa = open(fa_name, "w")
+            fastx_to_gsnap_fasta(reads, out_fa)
+            out_fa.close()
+        else:
+            # if it's a single fasta, don't need to write any new files.
+            fa_name = reads[0]
     gmap_setup(gsnap_path, out_dir, ref_fasta)
     gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, fa_name, cpu_count=CPU_COUNT - 1)
     paired_end = len(reads) > 1
