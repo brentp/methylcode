@@ -11,10 +11,8 @@ from pyfasta import complement
 def gen_record_from_raw(reads, na="I"):
     for i, line in enumerate(open(reads)):
         line = line.strip()
-        yield ["@%i" % i,
-               "%s" % line,
-                "+",
-                na * len(line)]
+        yield [">%i" % i,
+               "%s" % line]
 
 def gen_record_from_fastq(reads):
     fh = open(reads)
@@ -41,7 +39,8 @@ def main(reads, tags, fmt):
             else:
                 print >>sys.stderr, "warning:%s does not start with specified tags!"
             record[1] = seq
-            record[3] = record[3][-len(seq):][::-1] # strip the stuff for tags.
+            if len(record) > 2:
+                record[3] = record[3][-len(seq):][::-1] # strip the stuff for tags.
         print "\n".join(record)
         """
         if not tags:
