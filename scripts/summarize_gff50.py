@@ -1,11 +1,13 @@
 import sys
 import os.path as op
-sys.path.insert(0, "/home/brentp/src/methylcode/code/")
+sys.path.insert(0, "/home/brentp/src/methylcode/methylcoder/")
 
 from methyl import MethylGroup
 prefix = sys.argv[1] # something like: out1234n/thaliana_v9
 acontext = sys.argv[2] # CHH or CHG or CG
 window = 50
+
+script = op.basename(sys.argv[0])
 
 mg = MethylGroup(prefix)
 
@@ -35,4 +37,4 @@ for chr, m in mg.iteritems():
         plot = "%.3g" % plot
 
         attrs="c=%i;t=%i;n=%i" % (c_count, t_count, n)
-        print >>fh, "\t".join(map(str, [chr, sys.argv[0], "dmc", start + 1, end, plot, strand, ".", attrs]))
+        print >>fh, "\t".join(map(str, [chr, script, "dmc", start + 1, end, plot, strand, ".", attrs]))
