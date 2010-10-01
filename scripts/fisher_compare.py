@@ -8,7 +8,7 @@ usage:
 from fisher import pvalue
 import sys
 import os.path as op
-sys.path.insert(0, op.join(op.dirname(__file__), "../code"))
+sys.path.insert(0, op.join(op.dirname(__file__), "../methylcoder"))
 from methyl import MethylGroup
 from flatfeature import Flat
 
