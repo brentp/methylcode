@@ -88,6 +88,7 @@ def plot(names, labels, opts):
     plt.ylabel("Methylation [ C/(C + T) ]")
     if opts.title: plt.title(opts.title)
 
+    print >>sys.stderr, "saving to %s" % opts.out
     plt.savefig(opts.out)
 
 
@@ -118,7 +119,6 @@ if __name__ == "__main__":
         assert cs
         ts = [c.replace('.c.bin', '.t.bin') for c in cs]
         mt = [c.replace('.c.bin', '.methyltype.bin') for c in cs]
-        print cs
 
         ctms.append(zip(cs, ts, mt))
 
