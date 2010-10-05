@@ -23,7 +23,11 @@ def run_compare(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_
     print >>sys.stderr, "writing to:", fh.name
     print >>fh, "##gff-version 3"
     for chr in flat.seqids:
-        bp_max = len(flat.fasta[chr])
+        try:
+            bp_max = len(flat.fasta[chr])
+        except KeyError:
+            print >>sys.stderr, chr, "not found. skipping"
+            continue
         (a_cs, a_ts, a_mask), (b_cs, b_ts, b_mask) = bin_setup(chr, adir, bdir, context)
         for start in xrange(0, bp_max + window, window):
             end = min(start + window, bp_max)
@@ -61,8 +65,8 @@ def run_compare(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_
 
             if binary and plot != 'na': plot = 0 if pv > pvalue_cutoff else 1
 
-            attrs="p=%.3G;ac=%i;at=%i;bc=%i;bt=%i;gc=%i" % \
-                        (pv, a_c_count, a_t_count, b_c_count, b_t_count, gc)
+            attrs="p=%.3G;ac=%i;at=%i;bc=%i;bt=%i;gc=%i;plot=%.3G" % \
+                        (pv, a_c_count, a_t_count, b_c_count, b_t_count, gc, plot)
             """
             accns = flat.get_features_in_region(chr, start + 1, end)
             accns = [a["accn"] for a in accns]
@@ -89,9 +93,9 @@ if __name__ == "__main__":
     p.add_option("--ratio_range", dest="ratio_range", help="optional: range of ratios"
                  " to include. specify in format low:high. e.g.: 0.2:0.8")
     opts, args = p.parse_args()
-    f = Flat(opts.flat, opts.fasta)
     if len(args) != 2 or not (opts.context in ('CG', 'CHG', 'CHH')):
         sys.exit(not p.print_help())
+    f = Flat(opts.flat, opts.fasta)
     dir_a, dir_b = args
     assert op.exists(dir_a)
     assert op.exists(dir_b)
