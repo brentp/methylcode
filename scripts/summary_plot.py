@@ -51,7 +51,7 @@ def main(ctms, labels, opts):
 
 def add_label(rect, label):
     y = rect.get_height() + rect.get_y() + 0.01
-    x = rect.get_x()
+    x = rect.get_x() + rect.get_width() * 0.15
     plt.text(x, y, label, horizontalalignment='left',
                     verticalalignment='bottom',
                     rotation='vertical'
@@ -85,7 +85,7 @@ def plot(names, labels, opts):
     plt.xticks(xs - 0.66 * width  - (width + spacing) * i/2., xlabels)
     plt.legend((p1[0], p2[0], p3[0]), ('CG', 'CHG', 'CHH'))
     plt.xlabel("Sequence Id")
-    plt.ylabel("Methylation [ C/(C + T) ]")
+    plt.ylabel("Methylation  c/(c + t)")
     if opts.title: plt.title(opts.title)
 
     print >>sys.stderr, "saving to %s" % opts.out
@@ -122,5 +122,6 @@ if __name__ == "__main__":
 
         ctms.append(zip(cs, ts, mt))
 
-    labels = opts.labels.split("|") if opts.labels else args
+    labels = opts.labels.split("|") if opts.labels \
+                    else [x.rstrip("/") for x in args]
     main(ctms, labels, opts)
