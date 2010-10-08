@@ -298,7 +298,7 @@ def print_genome_summary(summary_counts, out):
         genome_dict['total_cs'] += d['cs']
         genome_dict['total_ts'] += d['ts']
 
-    print >>out, print_summary.format % genome_dict
+    print >>out, (print_summary.format % genome_dict).strip()
     print >>sys.stderr, print_summary.format % genome_dict
 
 def print_summary(seqid, cs, ts, mtype, summary_counts, out, print_header=False):
