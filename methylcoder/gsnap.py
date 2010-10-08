@@ -1,7 +1,7 @@
 import sys
 import os.path as op
 from methylcoder import is_up_to_date_b, CPU_COUNT, bin_paths_from_fasta, \
-        get_counts, _update_conversions, write_files
+        get_counts, _update_conversions, write_files, write_sam_commands
 from subprocess import Popen
 from pyfasta import Fasta
 
@@ -138,6 +138,14 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
 
     write_files(fa.fasta_name, out_dir, counts)
 
+    cmd = open(out_dir +"/cmd.ran", "w")
+    import datetime
+    print >>cmd, "#date:", str(datetime.date.today())
+    print >>cmd, "#path:", op.abspath(".")
+    print >>cmd, " ".join(sys.argv)
+    write_sam_commands(out_dir, fa, "methylcoded.gsnap")
+
+
 def is_fastq(f):
     fh = open(f)
     ifastq = (fh.readline()[0] == "@")
@@ -170,6 +178,8 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
 
 if __name__ == "__main__":
     import optparse
+    # NOTE: the actual entry point to this script is from __init__.py
+    # which calls the main() function.
     p = optparse.OptionParser( """
 convert fastq or fasta files, (paired-end or single) to fasta format used by gsnap.
 

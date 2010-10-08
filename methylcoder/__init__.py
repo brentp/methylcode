@@ -304,9 +304,11 @@ def print_genome_summary(summary_counts, out):
 def print_summary(seqid, cs, ts, mtype, summary_counts, out, print_header=False):
     ms = methylation_summary(cs, ts, mtype)
     if print_header:
+        print >>out, "#", " ".join(sys.argv)
         header = print_summary.format.replace("-12i", "-12s").replace(".6f", "8s")
         labels = "seqid total_cs total_ts CG CG_cs CG_ts CHG CHG_cs CHG_ts CHH CHH_cs CHH_ts".split()
         print >>sys.stderr, header % dict(zip(labels, labels))
+        print >>out, (header % dict(zip(labels, labels))).strip()
     d = {'seqid': seqid, 'total_cs': cs.sum(), 'total_ts': ts.sum()}
     # print a quick summary of methylation for each context.
     for context in sorted(summary_counts.keys()):
@@ -318,8 +320,7 @@ def print_summary(seqid, cs, ts, mtype, summary_counts, out, print_header=False)
         summary_counts[context]['ts'] += ms[context]['ts']
         #summary += (" %s: %.4f" % (context, ms[context]['methylation']))
 
-    print >>out, "#", " ".join(sys.argv)
-    print >>out, print_summary.format % d
+    print >>out, (print_summary.format % d).strip()
     print >>sys.stderr, print_summary.format % d
 print_summary.format = "%(seqid)-12s %(total_cs)-12i %(total_ts)-12i %(CG)-.6f %(CG_cs)-12i %(CG_ts)-12i %(CHG)-.6f %(CHG_cs)-12i %(CHG_ts)-12i %(CHH)-.6f %(CHH_cs)-12i %(CHH_ts)-12i "
 
@@ -501,7 +502,7 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
         assert mt > 0, (seqid, mt, bp, c, t)
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
-def write_sam_commands(out_dir, fasta):
+def write_sam_commands(out_dir, fasta, fname="methylcoded"):
     fh_lens = open("%s/chr.lengths.txt" % out_dir, "w")
     for k in fasta.keys():
         print >>fh_lens, "%s\t%i" % (k, len(fasta[k]))
@@ -509,14 +510,14 @@ def write_sam_commands(out_dir, fasta):
     out = open("%s/commands.sam.sh" % out_dir, "w")
     print >> out, """\
 SAMTOOLS=/usr/local/src/samtools/samtools
-
-$SAMTOOLS view -b -t %(odir)s/chr.lengths.txt %(odir)s/methylcoded.sam \
-        -o %(odir)s/methylcoded.unsorted.bam
-$SAMTOOLS sort %(odir)s/methylcoded.unsorted.bam %(odir)s/methylcoded # suffix added
-$SAMTOOLS index %(odir)s/methylcoded.bam
+# 0x0004 takes only the aligned reads.
+$SAMTOOLS view -S -F 0x0004 -bu -t %(odir)s/chr.lengths.txt %(odir)s/%(fname)s.sam \
+        -o %(odir)s/%(fname)s.unsorted.bam
+$SAMTOOLS sort %(odir)s/%(fname)s.unsorted.bam %(odir)s/%(fname)s # suffix added
+$SAMTOOLS index %(odir)s/%(fname)s.bam
 # TO view:
-# $SAMTOOLS tview %(odir)s/methylcoded.bam %(fapath)s
-    """ % dict(odir=out_dir, fapath=fasta.fasta_name)
+# $SAMTOOLS tview %(odir)s/%(fname)s.bam %(fapath)s
+    """ % dict(odir=out_dir, fapath=fasta.fasta_name, fname=fname)
     out.close()
 
 def convert_reads_c2t(reads_path, ga=False):
