@@ -32,9 +32,8 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
 
     # for proofing.
     """
-    if allowed_mismatches < 0:
-        sys.stderr.write("ref:" + ref_seq + "\n")
-        sys.stderr.write("aln:" + aln_seq + "\n")
+    sys.stderr.write("ref:" + ref_seq + "\n")
+    sys.stderr.write("aln:" + aln_seq + "\n")
     tts = 0
     ccs = 0
     d = ["."] * n
@@ -55,9 +54,8 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
             # debug
             #d[i] = chr(c2); tts += 1
     """
-    if allowed_mismatches < 0:
-        sys.stderr.write("mat:" + "".join(d) + "\n")
-        sys.stderr.write("remained     c: %i\n" % ccs)
-        sys.stderr.write("converted to t: %i\n\n" % tts)
+    sys.stderr.write("mat:" + "".join(d) + "\n")
+    sys.stderr.write("remained     c: %i\n" % ccs)
+    sys.stderr.write("converted to t: %i\n\n" % tts)
     """
     return 0
