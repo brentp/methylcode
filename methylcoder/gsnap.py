@@ -52,7 +52,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
 
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoder.gsnap.sam"))
-    cmd = "%(gsnap_dir)s/src/gsnap --npaths 1 --quiet-if-excessive -A sam"
+    cmd = "%(gsnap_dir)s/src/gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s --cmet %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
