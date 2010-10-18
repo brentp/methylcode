@@ -28,6 +28,8 @@ def guess_index_class(filename):
     assert os.path.exists(filename)
     fh = open(filename)
     header = fh.readline()
+    while header[0] == "#":
+        header = fh.readline()
     assert header[0] in '@>', (header, "should be fastq or fasta")
     if header[0] == "@": return FastQIndex
     return FastaIndex
@@ -67,6 +69,14 @@ class FastQIndex(object):
         lines = sum(1 for line in fh)
         bnum = lines if lines > 2**24 else lines * 2
         fh.seek(0)
+        # iterate past comment lines.
+        pos = fh.tell()
+        line = fh.readline()
+        while line[0] == "#":
+            line = fh.readline()
+            pos = fh.tell()
+        fh.seek(pos)
+
         db = bsddb.btopen(filename + cls.ext, 'n', cachesize=32768*2,
                           pgsize=512)
         while True:
