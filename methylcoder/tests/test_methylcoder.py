@@ -32,25 +32,25 @@ class TestCountConversions(unittest.TestCase):
         self.tt = np.zeros((len(self.ref)), dtype=np.uint32)
 
     def test_count(self):
-        count = _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref))
+        count = _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref), False)
         self.assertEquals(count, 0, (count))
 
-        count = _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 0, len(self.ref))
+        count = _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 0, len(self.ref), False)
         self.assertEquals(count, 1, (count))
 
     def test_cts(self):
-        _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref))
+        _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref), False)
 
         self.assertEquals(self.cc.tolist(),  [0L, 0L, 0L, 1L, 0L, 0L, 0L, 0L])
         self.assertEquals(self.tt.tolist(),  [0L, 1L, 1L, 0L, 0L, 0L, 0L, 0L])
 
-        _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref))
+        _update_conversions(self.ref, self.aln, 0, "CT", self.cc, self.tt, 10, len(self.ref), False)
 
         self.assertEquals(self.cc.tolist(),  [0L, 0L, 0L, 2L, 0L, 0L, 0L, 0L])
         self.assertEquals(self.tt.tolist(),  [0L, 2L, 2L, 0L, 0L, 0L, 0L, 0L])
 
     def test_gas(self):
-        _update_conversions(self.ref, self.aln, 0, "GA", self.cc, self.tt, 10, len(self.ref))
+        _update_conversions(self.ref, self.aln, 0, "GA", self.cc, self.tt, 10, len(self.ref), False)
         for c, t, r, a in zip(self.cc, self.tt, self.ref, self.aln):
             if c != 0:
                 self.assertEquals(r, "G")

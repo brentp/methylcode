@@ -126,3 +126,41 @@ cdef _cs2seq(char *cs):
         return seq
     finally:
         free(seq)
+
+cdef dict seqspace = {
+    'AT': 3,
+    'AG': 2,
+    'AC': 1,
+    'AA': 0,
+    'CT': 2,
+    'CG': 3,
+    'CC': 0,
+    'CA': 1,
+    'GT': 1,
+    'GG': 0,
+    'GC': 3,
+    'GA': 2,
+    'TT': 0,
+    'TG': 1,
+    'TC': 2,
+    'TA': 3}
+
+def seq2cs(char *seq):
+    """
+    convert sequence into colorspace
+    """
+    seqlen = strlen(seq)
+    cdef char *cs = <char *>malloc(sizeof(char) * (seqlen))
+    cdef char[3] dub
+    dub[2] = '\0'
+    cs[0] = seq[0]
+    cdef int i
+    for i in range(seqlen - 1):
+        dub[0] = seq[i]
+        dub[1] = seq[i + 1]
+        cs[i + 1] = seqspace[dub] + 48
+    try:
+        return cs
+    finally:
+        free(cs)
+

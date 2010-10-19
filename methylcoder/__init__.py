@@ -23,7 +23,7 @@ import os.path as op
 import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
-from cbowtie import _update_conversions
+from cbowtie import _update_conversions, seq2cs, cs2seq
 from fastqindex import guess_index_class, advance_file_handle_past_comments
 import string
 import glob
@@ -530,7 +530,16 @@ $SAMTOOLS index %(odir)s/%(fname)s.bam
     """ % dict(odir=out_dir, fapath=fasta.fasta_name, fname=fname)
     out.close()
 
-def convert_reads_c2t(reads_path, ga=False):
+def convert_colorspace(color_seq, char_a, char_b):
+    """
+    take a colorspace read, convert to base sequence
+    convert C to T (char_a to char_b) then back to
+    colorspace and return
+    """
+    base_seq = cs2seq(color_seq.rstrip()).replace(char_a, char_b)
+    return seq2cs(base_seq)
+
+def convert_reads_c2t(reads_path, ga=False, is_colorspace=False):
     """
     assumes all capitals returns the new path and creates and index.
     """
@@ -545,7 +554,8 @@ def convert_reads_c2t(reads_path, ga=False):
     if is_up_to_date_b(reads_path, c2t) and is_up_to_date_b(c2t, idx):
         return c2t, IndexClass
 
-    print >>sys.stderr, "converting C to T in %s" % (reads_path)
+    char_a, char_b = 'GA' if ga else 'CT'
+    print >>sys.stderr, "converting %s to %s in %s" % (char_a, char_b, reads_path)
 
     try:
         out = open(c2t, 'wb')
@@ -565,11 +575,12 @@ def convert_reads_c2t(reads_path, ga=False):
             db[header[1:].split()[0]] = str(pos)
             seq = next_line()
             out.write(header + '\n')
-            if ga:
-                out.write(seq.replace('G', 'A'))
+            if is_colorspace:
+                out.write(convert_colorspace(seq, char_a, char_b) + "\n")
             else:
-                out.write(seq.replace('C', 'T'))
+                out.write(seq.replace(char_a, char_b))
             for i in lines: out.write(next_line())
+
 
         out.close()
         print >>sys.stderr, "opening index"
@@ -616,15 +627,15 @@ def _mapper(args):
     """used to parallelize convert_reads_c2t"""
     return convert_reads_c2t(*args)
 
-def get_index_and_c2t(read_paths):
+def get_index_and_c2t(read_paths, is_colorspace):
     IndexClass = None
     c2t_reads_list = []
     if len(read_paths) == 1:
-        c2t_reads_path, IndexClass = convert_reads_c2t(read_paths[0], ga=False)
+        c2t_reads_path, IndexClass = convert_reads_c2t(read_paths[0], ga=False, is_colorspace=is_colorspace)
         c2t_reads_list = [c2t_reads_path]
     else:
         pool = processing.Pool(2)
-        results = pool.map(_mapper, [(read_paths[0], False), (read_paths[1], True)])
+        results = pool.map(_mapper, [(read_paths[0], False, is_colorspace), (read_paths[1], True, is_colorspace)])
         IndexClass = results[0][1]
         c2t_reads_list = [r[0] for r in results]
     return IndexClass, c2t_reads_list
@@ -685,7 +696,7 @@ def main():
     if pc2t and pc2t.wait() != 0: sys.exit(1)
     if punc and punc.wait() != 0: sys.exit(1)
 
-    IndexClass, c2t_reads_list = get_index_and_c2t(read_paths)
+    IndexClass, c2t_reads_list = get_index_and_c2t(read_paths, is_colorspace)
 
     ref_base = op.splitext(fr_c2t)[0]
 
