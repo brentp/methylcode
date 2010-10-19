@@ -24,7 +24,7 @@ import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
 from cbowtie import _update_conversions
-from fastqindex import guess_index_class
+from fastqindex import guess_index_class, advance_file_handle_past_comments
 import string
 import glob
 import datetime
@@ -46,7 +46,7 @@ except ImportError:
     import processing
     CPU_COUNT = processing.cpuCount()
 
-def write_c2t(fasta_name, unconverted):
+def write_c2t(fasta_name, unconverted, colorspace=False):
     """
     given a fasta file, write a new file:
         `some.fr.c2t.fasta` which contains:
@@ -58,6 +58,7 @@ def write_c2t(fasta_name, unconverted):
     without conversion.
     """
     d = op.join(op.dirname(fasta_name), "bowtie_index")
+    if colorspace: d += "_colorspace"
     if not op.exists(d): os.mkdir(d)
 
     p, ext = op.splitext(op.basename(fasta_name)) # some.fasta -> some, fasta
@@ -102,11 +103,11 @@ def is_up_to_date_b(a, b):
     return op.exists(b) and os.stat(b).st_mtime >= os.stat(a).st_mtime
 
 
-def run_bowtie_builder(bowtie_path, fasta_path):
+def run_bowtie_builder(bowtie_path, fasta_path, colorspace=False):
     d = os.path.dirname(fasta_path)
     p, ext = op.splitext(op.basename(fasta_path)) # some.fasta -> some, fasta
-    cmd = '%s/bowtie-build -q -f %s %s/%s > %s/%s.bowtie-build.log' % \
-                (bowtie_path, fasta_path, d, p, d, p)
+    cmd = '%s/bowtie-build -q %s -f %s %s/%s > %s/%s.bowtie-build.log' % \
+            (bowtie_path, "-C" if colorspace else "", fasta_path, d, p, d, p)
 
     if is_up_to_date_b(fasta_path, "%s/%s.1.ebwt" % (d, p)):
         print >>sys.stderr, "^ not running: %s ^" % cmd
@@ -153,7 +154,9 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
 
 
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
+def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name,
+              is_colorspace):
+    is_colorspace = int(is_colorspace)
     unmapped = open(unmapped_name, "w")
     print >>sys.stderr, "writing unmapped reads to %s" % (unmapped.name, )
     idx = 0
@@ -194,6 +197,7 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
         line[2] = seqid
 
         pos0 = int(line[3]) - 1
+        if is_colorspace: pos0 -= 2
         converted_seq = line[9]
 
         # we want to include the orginal, non converted reads
@@ -202,7 +206,7 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name):
         #fh_raw_reads.seek((read_id * read_len) + read_id)
         #raw_seq = fh_raw_reads.read(read_len)
         raw_fastq, converted_fastq = get_records(read_id, idx)
-        read_len = len(converted_seq)
+        read_len = len(converted_seq) + 3 * int(is_colorspace)
         raw_seq = raw_fastq.seq
 
         if direction == 'f':
@@ -346,7 +350,7 @@ def get_counts(fcpatt, ftpatt, fa):
     return counts
 
 def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, index_class, out_dir,
-                      allowed_mismatches, mode='w', counts=None):
+                      allowed_mismatches, mode='w', counts=None, is_colorspace=False):
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
 
     fh_raw_reads_list = [open(raw_reads) for raw_reads in raw_reads_list]
@@ -379,7 +383,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     skipped = 0
     align_count = 0
     for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths,
-                                                      get_records, unmapped_name):
+                                                      get_records, unmapped_name, is_colorspace):
         # read_id is also the line number from the original file.
         ###############
         ###############
@@ -405,6 +409,9 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
         genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len]).upper()
         DEBUG = False
         if DEBUG:
+            print >>sys.stderr, "=" * 80
+            print >>sys.stderr, sam_line
+            print >>sys.stderr, "=" * 80
             print >>sys.stderr, ">>", sam_line[1], sam_flag
             idx = 0 if (sam_flag & 128) == 0 else 1
             araw, ac2t = get_records(read_id, idx)
@@ -415,17 +422,19 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
             if direction == 'r':
                 print >>sys.stderr, "raw_read(r):", raw
                 c2t = ac2t.seq
-                if (sam_flag & 128) == 0:
-                    c2t = revcomp(c2t)
-                assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
+                if not is_colorspace:
+                    if (sam_flag & 128) == 0:
+                        c2t = revcomp(c2t)
+                    assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
 
             else:
                 print >>sys.stderr, "raw_read(f):", raw
                 c2t = ac2t.seq
-                if (sam_flag & 128) != 0:
-                    c2t = revcomp(c2t)
-                    p['read_sequence'] = revcomp(p['read_sequence'])
-                assert c2t == p['read_sequence'], (c2t, p['read_sequence'], sam_flag)
+                if not is_colorspace:
+                    if (sam_flag & 128) != 0:
+                        c2t = revcomp(c2t)
+                        p['read_sequence'] = revcomp(p['read_sequence'])
+                    assert c2t == p['read_sequence'], (c2t, p['read_sequence'], sam_flag)
             print >>sys.stderr, "c2t        :",  c2t, "\n"
 
         # have to keep the ref in forward here to get the correct bp
@@ -443,7 +452,8 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
         this_skipped = _update_conversions(genomic_ref, raw, pos0, pairs,
                                        counts[p['seqid']]['c'],
                                        counts[p['seqid']]['t'],
-                                      remaining_mismatches, read_len)
+                                      remaining_mismatches, read_len, 
+                                           is_colorspace)
         if this_skipped == 0:
             # only print the line to the sam file if we use it in our calcs.
             print >>out_sam, "\t".join(sam_line)
@@ -542,6 +552,7 @@ def convert_reads_c2t(reads_path, ga=False):
         db = bsddb.btopen(idx, 'n', cachesize=32768*2, pgsize=512)
 
         fh_fq = open(reads_path)
+        advance_file_handle_past_comments(fh_fq, out)
         tell = fh_fq.tell
         next_line = fh_fq.readline
         lines = range(2, IndexClass.entry_class.lines)
@@ -664,14 +675,15 @@ def main():
         sys.exit()
 
     opts.bowtie = op.abspath(opts.bowtie)
-    fr_c2t, fr_unc = write_c2t(fasta, unconverted)
 
-    pc2t = run_bowtie_builder(opts.bowtie, fr_c2t)
-    punc = run_bowtie_builder(opts.bowtie, fr_unc) if unconverted else None
-    if pc2t:
-        if pc2t.wait() != 0: sys.exit(1)
-    if punc:
-        if punc.wait() != 0: sys.exit(1)
+    # need to tell the index it's colorspace as well.
+    is_colorspace = "-C" in opts.extra_args or "--color" in opts.extra_args
+    fr_c2t, fr_unc = write_c2t(fasta, unconverted, is_colorspace)
+    pc2t = run_bowtie_builder(opts.bowtie, fr_c2t, is_colorspace)
+    punc = run_bowtie_builder(opts.bowtie, fr_unc, is_colorspace)  if unconverted else None
+
+    if pc2t and pc2t.wait() != 0: sys.exit(1)
+    if punc and punc.wait() != 0: sys.exit(1)
 
     IndexClass, c2t_reads_list = get_index_and_c2t(read_paths)
 
@@ -680,11 +692,11 @@ def main():
     try:
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
         sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.extra_args, bowtie_reads_flag)
-        counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches)
+        counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches, is_colorspace=is_colorspace)
         if unconverted and len(c2t_reads_list) == 1 and sum(1 for _ in open(unmatched)) != 0:
             sam = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
             counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
-                                          opts.out_dir, opts.mismatches, mode='a', counts=counts)
+                                          opts.out_dir, opts.mismatches, mode='a', counts=counts, is_colorspace=is_colorspace)
         write_files(fasta, opts.out_dir, counts)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
