@@ -8,8 +8,7 @@ usage:
 from fisher import pvalue
 import sys
 import os.path as op
-sys.path.insert(0, op.join(op.dirname(__file__), "../code"))
-from methyl import MethylGroup
+from methylcoder.methyl import MethylGroup
 from flatfeature import Flat
 
 def bin_setup(chr, adir, bdir, context):
@@ -42,14 +41,17 @@ def run_compare(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_
 
             # if a_tot or b_tot == 0, then use 'na'
             a_tot = float(a_c_count + a_t_count)
-            a_methyl = (a_c_count / a_tot) if a_tot != 0 else None
+            a_methyl = (a_c_count / a_tot) if a_tot != 0 else 0#None
 
             b_tot = float(b_c_count + b_t_count)
-            b_methyl = (b_c_count / b_tot) if b_tot !=0 else None
+            b_methyl = (b_c_count / b_tot) if b_tot !=0 else 0#None
             #strand = "+" if a_methyl > b_methyl else "-"
             strand = "."
             # TODO: use absolute?
             plot = a_methyl - b_methyl if not None in (a_methyl, b_methyl) else 'na'
+
+            # scale by total.
+            plot = plot / (a_methyl + b_methyl)
 
             #print plot, a_methyl, b_methyl
             #if plot == 'na': continue
@@ -57,18 +59,18 @@ def run_compare(flat, adir, bdir, context, window, binary, pvalue_cutoff, ratio_
                 if plot != 'na':
                     plot == 1 if (ratio_range[0] <= plot <= ratio_range[1]) else 0
             else:
-                if not (ratio_range[0] <= plot <= ratio_range[1]): continue
+                if not (ratio_range[0] <= plot <= ratio_range[1]):
+                    #print >>sys.stderr, "skipping because of ratio range."
+                    continue
 
             if binary and plot != 'na': plot = 0 if pv > pvalue_cutoff else 1
 
             attrs="p=%.3G;ac=%i;at=%i;bc=%i;bt=%i;gc=%i" % \
                         (pv, a_c_count, a_t_count, b_c_count, b_t_count, gc)
-            """
             accns = flat.get_features_in_region(chr, start + 1, end)
             accns = [a["accn"] for a in accns]
             if accns:
                 attrs +=";accns=" + ",".join(accns)
-            """
             print >>fh, "\t".join(map(str, [chr, "methylation", "dmc", start + 1, end, plot, strand, ".", attrs]))
 
 if __name__ == "__main__":
