@@ -27,6 +27,7 @@ class FastQEntry(object):
 def guess_index_class(filename):
     assert os.path.exists(filename)
     fh = open(filename)
+    advance_file_handle_past_comments(fh)
     header = fh.readline()
     assert header[0] in '@>', (header, "should be fastq or fasta")
     if header[0] == "@": return FastQIndex
@@ -53,6 +54,15 @@ class RawEntry(FastQEntry):
     def __init__(self, fh):
         self.seq = fh.readline().rstrip('\r\n')
 
+def advance_file_handle_past_comments(fh, out=None):
+    pos = fh.tell()
+    line = fh.readline()
+    while line[0] == "#":
+        out and out.write(line)
+        pos = fh.tell()
+        line = fh.readline()
+    fh.seek(pos)
+
 
 class FastQIndex(object):
     ext = ".fqdx"
@@ -67,6 +77,9 @@ class FastQIndex(object):
         lines = sum(1 for line in fh)
         bnum = lines if lines > 2**24 else lines * 2
         fh.seek(0)
+        # iterate past comment lines.
+        advance_file_handle_past_comments(fh)
+
         db = bsddb.btopen(filename + cls.ext, 'n', cachesize=32768*2,
                           pgsize=512)
         while True:
@@ -98,6 +111,7 @@ class FastQIndex(object):
 
     def get_position(self, key):
         return long(self.db.get(key, None))
+
 
     def __len__(self):
         return len(self.db)

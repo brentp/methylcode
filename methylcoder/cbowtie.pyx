@@ -1,22 +1,31 @@
+#cython: boundscheck=False
+#cython: wraparound=False
+
+from libc.stdlib cimport malloc, free
+from libc.string cimport strlen
+
 import numpy as np
 cimport numpy as np
-cimport stdlib
 import sys
 
 
-def _update_conversions(char *ref_seq, char *aln_seq, int base_position, 
+def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
                         char *pair,
                         np.ndarray[np.uint32_t] c_count,
                         np.ndarray[np.uint32_t] t_count,
-                       int allowed_mismatches, int n):
+                       int allowed_mismatches, int n,
+                       bint is_colorspace):
     """
     this updates the conversions (counts) from c2t in between
     the ref_sequence and the aln_seq
     first it checks if the sequence was mistakenly aligned by the c2t 
     conversion. if so, it does not update the counts.
     """
-    cdef int i #, n = stdlib.strlen(ref_seq)
+    cdef int i
     cdef char a, b
+    if is_colorspace:
+        t = cs2seq(aln_seq)
+        aln_seq = t
     # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]
     if allowed_mismatches > -1:
@@ -25,16 +34,15 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
             # bowtie couldnt find this cause we
             # converted C to T.
             if ref_seq[i] != c2: continue
-            if aln_seq[i] == c1: 
+            if aln_seq[i] == c1:
                 if allowed_mismatches == 0: return 1
                 allowed_mismatches -= 1
         if allowed_mismatches < 0: return 1
 
     # for proofing.
     """
-    if allowed_mismatches < 0:
-        sys.stderr.write("ref:" + ref_seq + "\n")
-        sys.stderr.write("aln:" + aln_seq + "\n")
+    sys.stderr.write("ref:" + ref_seq + "\n")
+    sys.stderr.write("aln:" + aln_seq + "\n")
     tts = 0
     ccs = 0
     d = ["."] * n
@@ -55,9 +63,104 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
             # debug
             #d[i] = chr(c2); tts += 1
     """
-    if allowed_mismatches < 0:
-        sys.stderr.write("mat:" + "".join(d) + "\n")
-        sys.stderr.write("remained     c: %i\n" % ccs)
-        sys.stderr.write("converted to t: %i\n\n" % tts)
+    sys.stderr.write("mat:" + "".join(d) + "\n")
+    sys.stderr.write("remained     c: %i\n" % ccs)
+    sys.stderr.write("converted to t: %i\n\n" % tts)
     """
     return 0
+
+cdef dict colorspace = {
+    65: [ # A
+        65, # 0
+        67, # 1
+        71, # 2
+        84, # 3
+        78, # 4
+        78],# .
+    67: # C
+        [ 67, 65, 84, 71, 78, 78],
+    71: # G
+        [71, 84, 65, 67, 78, 78],
+    84:  # T
+        [84, 71, 67, 65, 78, 78],
+    78:  # N
+        [ 78, 78, 78, 78, 78],
+}
+
+
+def cs2seq(cs):
+    """
+    convert a color-space encoded read to DNA sequence
+    >>> cs2seq('A32102302224')
+    'ATCAAGCCTCTN'
+
+    >>> cs2seq('42220320123A')
+    'NTCTCCGAACTA'
+
+    """
+    if not cs[0] in "ACGTN":
+        cs = cs[::-1]
+        return _cs2seq(cs)[::-1]
+    return _cs2seq(cs)
+
+
+cdef _cs2seq(char *cs):
+    cdef int seqlen = strlen(cs)
+    #print >>sys.stderr, "\n\n%s" % cs
+    cdef int i = 0
+    cdef char *seq = <char *>malloc(sizeof(char) * (1 + seqlen))
+    seq[0] = cs[0]
+    #cdef object k1, k2
+    cdef char k1, k2
+    cdef int start = 1, stop = seqlen
+    cdef list sublist
+
+    for i in range(start, stop):
+
+        k1 = seq[i - 1] # decoded DNA character
+        k2 = cs[i] - 48 # char number to index
+        sublist = colorspace[k1]
+        seq[i] = sublist[k2]
+    seq[seqlen] = c'\0'
+    try:
+        return seq
+    finally:
+        free(seq)
+
+cdef dict seqspace = {
+    'AT': 3,
+    'AG': 2,
+    'AC': 1,
+    'AA': 0,
+    'CT': 2,
+    'CG': 3,
+    'CC': 0,
+    'CA': 1,
+    'GT': 1,
+    'GG': 0,
+    'GC': 3,
+    'GA': 2,
+    'TT': 0,
+    'TG': 1,
+    'TC': 2,
+    'TA': 3}
+
+def seq2cs(char *seq):
+    """
+    convert sequence into colorspace
+    """
+    seqlen = strlen(seq)
+    cdef char *cs = <char *>malloc(sizeof(char) * (seqlen))
+    cdef char[3] dub
+    dub[2] = '\0'
+    cs[0] = seq[0]
+    cdef int i
+    for i in range(seqlen - 1):
+        dub[0] = seq[i]
+        dub[1] = seq[i + 1]
+        cs[i + 1] = seqspace[dub] + 48
+    try:
+        return cs
+    finally:
+        free(cs)
+

@@ -1,7 +1,7 @@
 import sys
 import os.path as op
 from methylcoder import is_up_to_date_b, CPU_COUNT, bin_paths_from_fasta, \
-        get_counts, _update_conversions, write_files
+        get_counts, _update_conversions, write_files, write_sam_commands
 from subprocess import Popen
 from pyfasta import Fasta
 
@@ -42,18 +42,19 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
         print >>sys.stderr, "^ NOT executing gmap/gsnap setup. everything is up to date.^"
     return ref_base
 
-def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count):
+def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count):
     #/opt/src/gmap/gmap-2010-03-09/src/gsnap --npaths 1 --quiet-if-excessive -A sam --nofails --nthreads 4 -D ./ -d hg19e_gmap --cmet bs_reads.fasta > bs.align.sam
     ref_base = op.splitext(ref_fasta)[0]
     ref_name = op.basename(ref_base)
     ref_dir = op.dirname(ref_fasta)
-    reads_fasta = op.abspath(reads_fasta)
+    reads_paths = [op.abspath(r) for r in reads_paths]
     log = op.join(out_dir, "gsnap_run.log")
 
-    out_sam = op.abspath(op.join(out_dir, "methylcoder.gnsap.sam"))
-    cmd = "%(gsnap_dir)s/src/gsnap --npaths 1 --quiet-if-excessive -A sam"
+    reads_paths_str = " ".join(reads_paths)
+    out_sam = op.abspath(op.join(out_dir, "methylcoder.gsnap.sam"))
+    cmd = "%(gsnap_dir)s/src/gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
-    cmd += " -d %(ref_name)s --cmet %(reads_fasta)s > %(out_sam)s 2> %(log)s"
+    cmd += " -d %(ref_name)s --cmet %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
     if not (op.exists(cmd_path) and open(cmd_path).read().strip() == cmd.strip()):
@@ -61,7 +62,8 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_fasta, cpu_count)
         print >>fh, cmd
         fh.close()
     print >>sys.stderr, "\n" + cmd
-    if is_up_to_date_b(reads_fasta, out_sam) and is_up_to_date_b(reads_fasta, cmd_path):
+    if all(is_up_to_date_b(r, out_sam) for r in reads_paths) \
+        and all(is_up_to_date_b(r, cmd_path) for r in reads_paths):
         print >>sys.stderr, "^ NOT executing gsnap. everything is up to date.^"
     else:
         fh = open(cmd_path, "w")
@@ -136,26 +138,48 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
 
     write_files(fa.fasta_name, out_dir, counts)
 
+    cmd = open(out_dir +"/cmd.ran", "w")
+    import datetime
+    print >>cmd, "#date:", str(datetime.date.today())
+    print >>cmd, "#path:", op.abspath(".")
+    print >>cmd, " ".join(sys.argv)
+    write_sam_commands(out_dir, fa, "methylcoded.gsnap")
+
+
+def is_fastq(f):
+    fh = open(f)
+    ifastq = (fh.readline()[0] == "@")
+    fh.close()
+    return ifastq
+
 def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
-    fa_name = out_dir + "/" + op.basename(reads[0]).rstrip("_1") + ".fasta"
-    if all(is_up_to_date_b(r, fa_name) for r in reads):
-        print >>sys.stderr, "using existing fasta"
+    fa_reads = out_dir + "/" + op.basename(reads[0]).rstrip("_1") + ".fasta"
+    if all(is_fastq(r) for r in reads):
+        print >>sys.stderr, "using existing reads files"
+        gsnap_reads = reads
+    elif all(is_up_to_date_b(r, fa_reads) for r in reads):
+        # fasta reads. up to date.
+        gsnap_reads = reads
     else:
-        if len(reads) > 1 or open(reads[0]).readline()[0] != ">":
-            out_fa = open(fa_name, "w")
+        # its a pair of fasta files. put into gsnap format.
+        if len(reads) > 1:
+            out_fa = open(fa_reads, "w")
             fastx_to_gsnap_fasta(reads, out_fa)
             out_fa.close()
+            gsnap_reads = (fa_reads,)
         else:
             # if it's a single fasta, don't need to write any new files.
-            fa_name = reads[0]
+            gsnap_reads = (reads[0],)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
-    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, fa_name, cpu_count=CPU_COUNT - 1)
+    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, gsnap_reads, cpu_count=CPU_COUNT - 1)
     paired_end = len(reads) > 1
 
     parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end)
 
 if __name__ == "__main__":
     import optparse
+    # NOTE: the actual entry point to this script is from __init__.py
+    # which calls the main() function.
     p = optparse.OptionParser( """
 convert fastq or fasta files, (paired-end or single) to fasta format used by gsnap.
 
