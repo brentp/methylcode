@@ -23,10 +23,6 @@ def _update_conversions(char *ref_seq, char *aln_seq, int base_position,
     """
     cdef int i
     cdef char a, b
-    if is_colorspace:
-        t = cs2seq(aln_seq)
-        aln_seq = t
-    # CT, GA
     cdef char c1 = pair[0], c2 = pair[1]
     if allowed_mismatches > -1:
         for i in range(n):

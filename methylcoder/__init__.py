@@ -208,6 +208,8 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name,
         raw_fastq, converted_fastq = get_records(read_id, idx)
         read_len = len(converted_seq) + 3 * int(is_colorspace)
         raw_seq = raw_fastq.seq
+        if is_colorspace:
+            raw_seq = cs2seq(raw_seq)
 
         if direction == 'f':
             line[9] = raw_seq
@@ -384,19 +386,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     align_count = 0
     for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths,
                                                       get_records, unmapped_name, is_colorspace):
-        # read_id is also the line number from the original file.
-        ###############
-        ###############
-        ###############
-        ###############
-        ###############
-        #if direction != 'r': continue
-        #if sam_line[1] != '147': continue
-        ###############
-        ###############
-        ###############
-        ###############
-        ###############
+
         pairs = "CT" if direction == "f" else "GA" #
         read_id = p['read_id']
         pos0 = p['pos0']
@@ -452,7 +442,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
         this_skipped = _update_conversions(genomic_ref, raw, pos0, pairs,
                                        counts[p['seqid']]['c'],
                                        counts[p['seqid']]['t'],
-                                      remaining_mismatches, read_len, 
+                                      remaining_mismatches, read_len,
                                            is_colorspace)
         if this_skipped == 0:
             # only print the line to the sam file if we use it in our calcs.
