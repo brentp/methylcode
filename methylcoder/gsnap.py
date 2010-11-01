@@ -134,7 +134,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
         read_len = len(ref_seq)
         _update_conversions(ref_seq, aln_seq, bp0, letters,
                             counts[seqid]['c'], counts[seqid]['t'],
-                            50, read_len)
+                            50, read_len, False)
 
     write_files(fa.fasta_name, out_dir, counts)
 
