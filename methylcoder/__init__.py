@@ -351,6 +351,21 @@ def get_counts(fcpatt, ftpatt, fa):
         counts[seqid] = tc
     return counts
 
+def copy_header(out_sam, sam_file, chr_lengths):
+    """when creating the new sam file, copy the header stuff from
+    the original file"""
+    for seqid, len in chr_lengths.iteritems():
+        print >>out_sam, "@SQ\tSN:%s\tLN:%i" % (seqid, len)
+
+    # copy new header.
+    for line in open(sam_file):
+        if line[0] != "@": break
+        if line.startswith("@SQ"): continue
+        print >>out_sam, line.strip()
+    print >>out_sam, "\t".join(["@PG", "ID:MethylCoder", "VN:%s" % __version__,
+                               "CL:\"%s\"" % " ".join(sys.argv)])
+
+
 def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, index_class, out_dir,
                       allowed_mismatches, mode='w', counts=None, is_colorspace=False):
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
@@ -368,6 +383,8 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
     out_sam = open(out_dir + "/methylcoded.sam", mode)
+
+    copy_header(out_sam, sam_file, chr_lengths)
 
     # get the 3 possible binary files for each chr
     fc, ft, fmethyltype = \
