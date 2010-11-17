@@ -171,7 +171,7 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
             # if it's a single fasta, don't need to write any new files.
             gsnap_reads = (reads[0],)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
-    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, gsnap_reads, cpu_count=CPU_COUNT - 1)
+    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, gsnap_reads, cpu_count=CPU_COUNT)
     paired_end = len(reads) > 1
 
     parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end)
