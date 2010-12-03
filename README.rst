@@ -1,8 +1,9 @@
 MethylCoder
 ===========
 
-Single entry point for fast, simple processing of bisulfite-treated reads
-into methylation data. Also includes scripts for analysis and visualization.
+MethylCoder is a single program that takes of bisulfite-treated reads and
+outputs per-base methylation data. It also includes scripts for analysis
+and visualization.
 In addition to a binary output and a SAM alignment file, the direct output
 of methylcoder is a text file that looks like ::
 
@@ -163,6 +164,14 @@ and that string will be passed directly to the bowtie invocation when it is
 called from methylcoder. Whenever 2 fastq files are sent, they are assumed
 to be paired-end reads.
 
+Limitations
+===========
+
+  + when using bowtie, the reference size must be <= 1.8 Gigabases. This
+    limitation can be circumvented by splitting the reference into 2 smaller
+    reference sequences. For example with human, splitting into 2 fasta files,
+    one with chromosomes 1-9 and the other with chromosomes 10+ works well.
+    This limitation does not exist when GSNAP is used as the aligner.
 
 Analysis/Visualization
 ======================
