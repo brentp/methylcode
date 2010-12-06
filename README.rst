@@ -81,8 +81,8 @@ The input to the pipeline is:
 * a reference fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped.
 * a fastq  or fasta reads file. all reads must be the same length and must be
-  from Eckers/Zilberman bisulfite process if bowtie is used. May be from the other
-  protocol if --gsnap is specified.
+  from Eckers/Zilberman bisulfite process (with only 2 possibilities not 4 from
+  Cokus protocol).
   If 2 read files are specified, they are assumed to be pair ends and the aligner is
   called appropriately.
 
