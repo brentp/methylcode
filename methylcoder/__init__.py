@@ -215,6 +215,12 @@ def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name,
             line[9] = raw_seq
         else:
             pos0 = chr_lengths[seqid] - pos0 - read_len
+            # adjust mate position as well.
+            mpos = int(line[7])
+            mpos = chr_lengths[seqid] - mpos - read_len + 2
+            line[8] = str(pos0 - mpos + 1) # insert size
+            line[7] = str(mpos)
+
             line[3] = str(pos0 + 1)
             # since the read matched the flipped genome. we flip it here.
             line[9] = raw_seq = revcomp(raw_seq)
@@ -528,7 +534,7 @@ def write_sam_commands(out_dir, fasta, fname="methylcoded"):
     print >> out, """\
 SAMTOOLS=/usr/local/src/samtools/samtools
 # 0x0004 takes only the aligned reads.
-$SAMTOOLS view -S -F 0x0004 -bu -t %(odir)s/chr.lengths.txt %(odir)s/%(fname)s.sam \
+$SAMTOOLS view -bS -F 0x0004 %(odir)s/%(fname)s.sam \
         -o %(odir)s/%(fname)s.unsorted.bam
 $SAMTOOLS sort %(odir)s/%(fname)s.unsorted.bam %(odir)s/%(fname)s # suffix added
 $SAMTOOLS index %(odir)s/%(fname)s.bam
