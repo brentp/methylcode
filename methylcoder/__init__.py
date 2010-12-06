@@ -417,6 +417,17 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
         raw = p['raw_read']
         sam_flag = int(sam_line[1])
 
+
+        # paired and first of read and ends have overlap.
+        # this section makes sure that the overlap is only counted 1x.
+        if sam_line[7] != '0' and 0 <= int(sam_line[8]) < read_len:
+            offset = int(sam_line[8])
+            pos0 = pos0 + read_len - offset
+            read_len = offset
+            raw = raw[-offset:]
+            # chop the read info to the non-overlapping bases.
+            p['read_sequence'] = p['read_sequence'][-offset:]
+
         # the position is the line num * the read_id + read_id (where the +
         # is to account for the newlines.
         genomic_ref = str(fa[p['seqid']][pos0:pos0 + read_len]).upper()
@@ -428,6 +439,8 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
             print >>sys.stderr, ">>", sam_line[1], sam_flag
             idx = 0 if (sam_flag & 128) == 0 else 1
             araw, ac2t = get_records(read_id, idx)
+            #araw.seq = araw.seq[-offset:]
+            #c2t.seq = ac2t.seq[-offset:]
             print >>sys.stderr, "f['%s'][%i:%i + %i]" % (p['seqid'], pos0,
                                                          pos0, read_len)
             print >>sys.stderr, "mismatches:", p['nmiss']
@@ -437,7 +450,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
                 c2t = ac2t.seq
                 if not is_colorspace:
                     if (sam_flag & 128) == 0:
-                        c2t = revcomp(c2t)
+                        c2t = revcomp(c2t)[-offset:]
                     assert c2t == p['read_sequence'], (c2t, p['read_sequence'])
 
             else:
