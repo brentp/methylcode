@@ -1,7 +1,9 @@
 import sys
 import os.path as op
+import os
 from methylcoder import is_up_to_date_b, CPU_COUNT, bin_paths_from_fasta, \
-        get_counts, _update_conversions, write_files, write_sam_commands
+        get_counts, _update_conversions, write_files, write_sam_commands, \
+        is_same_cmd
 from subprocess import Popen
 from pyfasta import Fasta
 
@@ -22,11 +24,11 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
-    if not op.exists(cmd_last) or not is_up_to_date_b(ref_fasta, cmd_last):
+    if not op.exists(cmd_last) or not is_up_to_date_b(ref_fasta, cmd_last) or not is_same_cmd(cmd, cmd_last):
         fh = open(cmd_last, "w")
         print >>fh, cmd
         fh.close()
-    elif is_up_to_date_b(ref_fasta, cmd_last) and cmd.strip() != open(cmd_last).read().strip():
+    elif is_up_to_date_b(ref_fasta, cmd_last) and not is_same_cmd(cmd, cmd_last):
         fh = open(cmd_last, "w")
         print >>fh, cmd
         fh.close()
@@ -51,18 +53,21 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
     log = op.join(out_dir, "gsnap_run.log")
 
     reads_paths_str = " ".join(reads_paths)
-    out_sam = op.abspath(op.join(out_dir, "methylcoder.gsnap.sam"))
+    out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
     cmd = "%(gsnap_dir)s/src/gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s --cmet %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
-    if not (op.exists(cmd_path) and open(cmd_path).read().strip() == cmd.strip()):
+    new_cmd = False
+    if not is_same_cmd(cmd, cmd_path):
         fh = open(cmd_path, "w")
         print >>fh, cmd
         fh.close()
+        new_cmd = True
+
     print >>sys.stderr, "\n" + cmd
-    if all(is_up_to_date_b(r, out_sam) for r in reads_paths) \
+    if not new_cmd and all(is_up_to_date_b(r, out_sam) for r in reads_paths) \
         and all(is_up_to_date_b(r, cmd_path) for r in reads_paths):
         print >>sys.stderr, "^ NOT executing gsnap. everything is up to date.^"
     else:
@@ -71,7 +76,10 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
         fh.close()
         print >>sys.stderr, "^ executing gsnap. ^"
         p = Popen(cmd.replace('\n', ' '), shell=True)
-        p.wait()
+        if p.wait() != 0:
+            os.unlink(out_sam)
+            print >>sys.stderr, "ERROR:\n", open(log).read()
+            sys.exit(1)
     return out_sam
 
 def fastx_to_gsnap_fasta(reads, out_fa=sys.stdout):
@@ -110,31 +118,47 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
 
 
     print >>sys.stderr, "tabulating methylation"
+    gsnap_subset = open(gsnap_f.replace(".gsnap.sam", ".sam"), "w")
 
     for sline in open(gsnap_f):
-        if sline.startswith("@SQ"): continue
+        if sline.startswith("@SQ"):
+            print >>gsnap_subset, sline.strip()
+            continue
 
         # the ends didn't map to same spot.
         line = sline.split("\t")
+        sam_flag = int(line[1])
         if paired_end:
             if line[6] != "=": continue
+            print >>gsnap_subset, sline.strip()
         else:
             # no reported alignments.
-            if line[1] == '4': continue
+            if sam_flag == 4: continue
 
         seqid = line[2]
-        sam_flag = int(line[1])
         aln_seq = line[9]
+        read_len = len(aln_seq)
         bp0 = int(line[3]) - 1
-        bp1 = bp0 + len(aln_seq)
         ga = ((sam_flag & 16) != 0) ^ (sam_flag & 128 != 0)
+
+        # handle overlapping reads.
+        #if line[7] != '0' and 0 <= int(line[8]) < read_len:
+            #    offset = int(line[8])
+            #bp0 = bp0 + read_len - offset
+            #read_len = offset
+            ## chop the read info to the non-overlapping bases.
+            #aln_seq = aln_seq[-offset:]
+
+        bp1 = bp0 + read_len
         ref_seq = (fa[seqid][bp0:bp1]).upper()
+
 
         letters = 'GA' if ga else 'CT'
         read_len = len(ref_seq)
+        assert read_len > 0, (bp0, bp1)
         _update_conversions(ref_seq, aln_seq, bp0, letters,
                             counts[seqid]['c'], counts[seqid]['t'],
-                            50, read_len, False)
+                            50, read_len, line[5])
 
     write_files(fa.fasta_name, out_dir, counts)
 
@@ -143,7 +167,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
     print >>cmd, "#date:", str(datetime.date.today())
     print >>cmd, "#path:", op.abspath(".")
     print >>cmd, " ".join(sys.argv)
-    write_sam_commands(out_dir, fa, "methylcoded.gsnap")
+    write_sam_commands(out_dir, fa, "methylcoder.gsnap")
 
 
 def is_fastq(f):

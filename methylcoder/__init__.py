@@ -20,6 +20,7 @@ import numpy as np
 import bsddb
 import sys
 import os.path as op
+sys.path.insert(0, op.dirname(__file__))
 import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
@@ -147,9 +148,14 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
 
     process = Popen(cmd, shell=True)
     print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
-    if process.wait() != 0:
-        print >>sys.stderr, "errors running bowtie"
+    ret = process.wait()
+    log_txt = open("%(out_dir)s/bowtie.log" % locals()).read()
+    if ret != 0 or ' re-run' in log_txt or 'terminate' in log_txt:
+        os.unlink(sam_out_file)
+        print >>sys.stderr, "errors running bowtie (you may need to specify" \
+                            " --phred64-quals)"
         sys.exit(1)
+
     return sam_out_file
 
 
@@ -479,7 +485,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
                                        counts[p['seqid']]['c'],
                                        counts[p['seqid']]['t'],
                                       remaining_mismatches, read_len,
-                                           is_colorspace)
+                                           sam_line[5])
         if this_skipped == 0:
             # only print the line to the sam file if we use it in our calcs.
             print >>out_sam, "\t".join(sam_line)
@@ -489,7 +495,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     print >>sys.stderr, "total alignments: %i" % align_count
     print >>sys.stderr, \
             "skipped %i alignments (%.3f%%) where read T mapped to genomic C" % \
-                  (skipped, 100.0 * skipped / align_count)
+                  (skipped, 100.0 * skipped / (align_count or 1))
     return counts, unmapped_name
 
 def write_files(original_fasta, out_dir, counts):
