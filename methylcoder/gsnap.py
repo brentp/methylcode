@@ -130,35 +130,41 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
         sam_flag = int(line[1])
         if paired_end:
             if line[6] != "=": continue
-            print >>gsnap_subset, sline.strip()
+            #print >>gsnap_subset, sline.strip()
         else:
             # no reported alignments.
             if sam_flag == 4: continue
 
+        print >>gsnap_subset, sline.rstrip("\n")
+
         seqid = line[2]
         aln_seq = line[9]
-        read_len = len(aln_seq)
+        read_length = len(aln_seq)
         bp0 = int(line[3]) - 1
         ga = ((sam_flag & 16) != 0) ^ (sam_flag & 128 != 0)
+        insert_length = int(line[8])
+            #line[9] = aln_seq
+            #line[10] = line[10][:len(aln_seq)]
 
-        # handle overlapping reads.
-        #if line[7] != '0' and 0 <= int(line[8]) < read_len:
-            #    offset = int(line[8])
-            #bp0 = bp0 + read_len - offset
-            #read_len = offset
-            ## chop the read info to the non-overlapping bases.
-            #aln_seq = aln_seq[-offset:]
+        # both ends start at exactly the same place.
+        if insert_length == 0: continue
+        # handle overlapping reads. one side has + insert, the other is -
+        if -read_length < insert_length < 0:
+            insert_length = abs(insert_length)
+            aln_seq = aln_seq[:-(read_length - insert_length)]
+            read_length = len(aln_seq)
+        if line[7] == '0': continue
 
-        bp1 = bp0 + read_len
+        bp1 = bp0 + read_length
         ref_seq = (fa[seqid][bp0:bp1]).upper()
 
 
         letters = 'GA' if ga else 'CT'
-        read_len = len(ref_seq)
-        assert read_len > 0, (bp0, bp1)
+        read_length = len(ref_seq)
+        assert read_length > 0, (bp0, bp1)
         _update_conversions(ref_seq, aln_seq, bp0, letters,
                             counts[seqid]['c'], counts[seqid]['t'],
-                            50, read_len, line[5])
+                            50, read_length, line[5])
 
     write_files(fa.fasta_name, out_dir, counts)
 
