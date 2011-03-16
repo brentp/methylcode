@@ -126,7 +126,7 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
     out_dir = opts.out_dir
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
-    cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --sam " + \
+    cmd = ("%(bowtie_path)s/bowtie %(bowtie_args)s --fullref --sam " + \
            "--chunkmbs 1024 --norc -p %(threads)d %(ref_path)s " + \
            "-%(bowtie_sequence_flag)s ") % locals()
     # single end reads
