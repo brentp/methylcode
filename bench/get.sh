@@ -47,3 +47,11 @@ tar xzvf bsmap-${BSMAP_VERSION}.tgz
 cd bsmap-${BSMAP_VERSION} && make -j3
 cd ../../
 
+mkdir -p reference && cd reference
+rm -f thaliana_v10.fasta
+for i in `seq 1 5` C M
+do
+    wget -O - ftp://ftp.arabidopsis.org/home/tair/Sequences/whole_chromosomes/TAIR10_chr${i}.fas >> thaliana_v10.fasta
+done
+
+cd ../../
