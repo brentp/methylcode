@@ -12,7 +12,7 @@ except ImportError:
     class V(object):
         version = 0.0
 
-ext_modules = [ Extension("methylcoder/cbowtie",
+ext_modules = [ Extension("methylcoder.cbowtie",
                 sources=["methylcoder/cbowtie.c"],
                 include_dirs=[np.get_include(), "methylcoder"]) ]
 
@@ -22,6 +22,7 @@ setup(
     version = V.version,
     ext_modules = ext_modules,
     packages=['methylcoder'],
+    package_dir={'methylcoder': 'methylcoder'},
     zip_safe=False,
     requires=['numpy', 'pyfasta'],
     test_suite="nose.collector",

@@ -185,7 +185,7 @@ def seq2cs(char *seq):
     convert sequence into colorspace
     """
     seqlen = strlen(seq)
-    cdef char *cs = <char *>malloc(sizeof(char) * (seqlen))
+    cdef char *cs = <char *>malloc(sizeof(char) * (1 + seqlen))
     cdef char[3] dub
     dub[2] = '\0'
     cs[0] = seq[0]
@@ -194,6 +194,7 @@ def seq2cs(char *seq):
         dub[0] = seq[i]
         dub[1] = seq[i + 1]
         cs[i + 1] = seqspace[dub] + 48
+    cs[seqlen] = c'\0'
     try:
         return cs
     finally:
