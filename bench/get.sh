@@ -53,5 +53,6 @@ for i in `seq 1 5` C M
 do
     wget -O - ftp://ftp.arabidopsis.org/home/tair/Sequences/whole_chromosomes/TAIR10_chr${i}.fas >> thaliana_v10.fasta
 done
+perl -pi -e "s/^>([^\s]+).*/>\1/;tr/C/c/" thaliana_v10.fasta
 
 cd ../../
