@@ -52,7 +52,7 @@ C
 -
 
 * `bowtie`_ to align the reads to the genome.
-* (optional) `gsnap`_ alternative aligner. (part of gmap).
+* (optional) `gsnap`_ (>= 2011-03-28) alternative aligner. (part of gmap).
 * (optional) `sam-tools`_ to view the alignments and processing the reads
 
 Installation
@@ -128,8 +128,7 @@ You must have:
     2) a reads file in fastq or fasta format. here: `reads.fastq`.
        if you have paired end reads, they must be specified in order 1, 2.
     3) a directory containing the bowtie and bowtie-build executables.
-       (or the path to the gmap/gsnap source directory containing util/ and
-       src/ dirs)
+       (or the path to the gmap/gsnap install directory the gsnap utilities
 
 An example command to run the pipeline is::
 
@@ -140,7 +139,7 @@ An example command to run the pipeline is::
 
 or using the gsnap aligner on paired-end reads.::
 
-    $ methylcoder --gsnap /usr/local/src/gmap/gmap-2010-03-09/ \
+    $ methylcoder --gsnap /usr/local/bin/ \
                   --reference /path/to/thaliana_v9.fasta \
                   /path/to/reads_1.fastq /path/to/reads_2.fastq
 

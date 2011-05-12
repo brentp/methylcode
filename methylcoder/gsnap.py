@@ -13,14 +13,14 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
     ref_dir = op.dirname(ref_fasta)
     ref_name = op.basename(ref_base)
     make_path = "%(out_dir)s/Makefile.%(ref_name)s" % locals()
-    gsnap_setup = op.join(gsnap_dir, "util", "gmap_setup")
+    gsnap_setup = op.join(gsnap_dir, "gmap_setup")
     # have to cd to the out_dir because gsnap writes to cwd.
     cmd = "\n cd %(ref_dir)s && \n"
     cmd += gsnap_setup
     cmd += " -D %(ref_dir)s -o %(make_path)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_setup.log && "
     cmd += "\n make -f %(make_path)s coords > gmap_coords.log && "
     cmd += "\n make -f %(make_path)s gmapdb > gmap_gmapdb.log &&"
-    cmd += "\n %(gsnap_dir)s/src/cmetindex -d %(ref_name)s -D %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
+    cmd += "\n %(gsnap_dir)s/cmetindex -d %(ref_name)s -F %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
@@ -54,7 +54,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
 
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
-    cmd = "%(gsnap_dir)s/src/gsnap --quiet-if-excessive -A sam"
+    cmd = "%(gsnap_dir)s/gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s --cmet %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()

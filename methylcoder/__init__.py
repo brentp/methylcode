@@ -679,8 +679,8 @@ def main():
     p = optparse.OptionParser(__doc__)
 
     p.add_option("--bowtie", dest="bowtie", help="path to bowtie directory")
-    p.add_option("--gsnap", dest="gsnap", help="path to gsnap directory"
-                " must contain src/ and util/ subdirectories")
+    p.add_option("--gsnap", dest="gsnap", help="path to gsnap installed "
+                 "bin directory")
     p.add_option("--outdir", dest="out_dir", help="path to a directory in "
                  "which to write the files", default=None)
     p.add_option("--unconverted", dest="unconverted", action="store_true",
