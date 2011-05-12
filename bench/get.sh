@@ -1,9 +1,6 @@
-BRAT_VERSION=1.2.2
-BISMARK_VERSION=0.5.0
-BSMAP_VERSION=2.0
+#!/bin/bash
 
-BOWTIE_VERSION=0.12.7
-GSNAP_VERSION=2011-03-28
+source ./versions.sh
 
 mkdir -p brat && \
 cd brat && \
@@ -37,12 +34,12 @@ mkdir -p gsnap && cd gsnap
 wget http://research-pub.gene.com/gmap/src/gmap-gsnap-${GSNAP_VERSION}.tar.gz
 tar xzvf gmap-gsnap-${GSNAP_VERSION}.tar.gz
 cd gmap-*${GSNAP_VERSION}*
-./configure && make -j3
+./configure --prefix=`pwd` && make -j3
 cd ../../
 
 
 mkdir -p bsmap && cd bsmap
-#wget http://bsmap.googlecode.com/files/bsmap-${BSMAP_VERSION}.tgz
+wget http://bsmap.googlecode.com/files/bsmap-${BSMAP_VERSION}.tgz
 tar xzvf bsmap-${BSMAP_VERSION}.tgz
 cd bsmap-${BSMAP_VERSION} && make -j3
 cd ../../
@@ -56,3 +53,8 @@ done
 perl -pi -e "s/^>([^\s]+).*/>\1/;tr/C/c/" thaliana_v10.fasta
 
 cd ../../
+
+wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.1.fastq | head -n 5000000 > WT_endosperm_BS_seq_raw_batch-2.1.fastq &
+wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.2.fastq | head -n 5000000 > WT_endosperm_BS_seq_raw_batch-2.2.fastq
+
+python scripts/fastq_pair_filter.py -t 20 -l 32 reads/WT_endosperm_BS_seq_raw_batch-2.1.fastq reads/WT_endosperm_BS_seq_raw_batch-2.2.fastq
