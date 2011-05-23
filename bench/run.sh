@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./versions.sh
+source ./params.sh
 
 #############
 # methylcoder
