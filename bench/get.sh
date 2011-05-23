@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ./versions.sh
+source ./params.sh
 
 mkdir -p brat && \
 cd brat && \
