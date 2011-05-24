@@ -38,6 +38,20 @@ cd gmap-*${GSNAP_VERSION}*
 ./configure --prefix=`pwd` && make -j3 && make install
 cd ../../
 
+# fastx for read trimming.
+mkdir -p fastx && cd fastx
+wget http://hannonlab.cshl.edu/fastx_toolkit/libgtextutils-0.6.tar.bz2
+bunzip2 libgtextutils-0.6.tar.bz2 && tar xvf libgtextutils-0.6.tar
+cd libgtextutils-0.6 && ./configure && make && sudo make install && sudo ldconfig
+cd ../
+sudo apt-get install pkg-config
+wget http://hannonlab.cshl.edu/fastx_toolkit/fastx_toolkit-${FASTX_VERSION}.tar.bz2
+bunzip2 fastx_toolkit-${FASTX_VERSION}.tar.bz2
+tar xvf fastx_toolkit-${FASTX_VERSION}.tar
+cd fastx_toolkit-${FASTX_VERSION} && ./configure && make && sudo make install
+cd ../../
+
+
 
 mkdir -p bsmap && cd bsmap
 wget http://bsmap.googlecode.com/files/bsmap-${BSMAP_VERSION}.tgz
