@@ -8,21 +8,21 @@ source ./params.sh
 
 # methylcoder-bowtie
 #-------------------
-/usr/bin/time -f "%M %U" methylcoder --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
         --outdir methylcoder_bowtie --extra-args "-m 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie.time
 
-/usr/bin/time -f "%M %U" methylcoder --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
         --outdir methylcoder_bowtie_2 --extra-args "-m 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie_2.time
 
 # methylcoder-gsnap
 #------------------
-/usr/bin/time -f "%M %U" methylcoder --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
         --outdir methylcoder_gsnap --extra-args "--quiet-if-excessive --npaths 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap.time
 
-/usr/bin/time -f "%M %U" methylcoder --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
         --outdir methylcoder_gsnap_2 --extra-args "--quiet-if-excessive --npaths 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap_2.time
 
@@ -31,15 +31,15 @@ source ./params.sh
 # bsseeker
 ##########
 
-/usr/bin/time -f "%M %U"\
+/usr/bin/time -f "%M %U" \
 python bsseeker/Preprocessing_genome.py -f $REF -t N \
         -p `pwd`/bowtie/bowtie-${BOWTIE_VERSION} 2> bsseeker.preprocess.time
 
-/usr/bin/time -f "%M %U"\
+/usr/bin/time -f "%M %U" \
 python bsseeker/BS_Seeker.py -p `pwd`/bowtie/bowtie-${BOWTIE_VERSION} -m 2 \
                    -t N -o bsseeker.output -i $R1 2> bsseeker.map.time
 
-/usr/bin/time -f "%M %U"\
+/usr/bin/time -f "%M %U" \
 python bsseeker/BSSout2SAM.py -r $REF -f bsseeker.output > bsseeker/output.sam \
  2> bsseeker.sam.time
 
@@ -47,7 +47,7 @@ python bsseeker/BSSout2SAM.py -r $REF -f bsseeker.output > bsseeker/output.sam \
 # bsmap
 #######
 
-/usr/bin/time -f "%M %U"\
+/usr/bin/time -f "%M %U" \
 bsmap/bsmap-${BSMAP_VERSION}/bsmap -a $R1 -b $R1 -d $REF -o bsmap/output.sam \
                         -v 2 -w 1 -p $PROCESSORS -m 0 -x 2000 2> bsmap.time
 
