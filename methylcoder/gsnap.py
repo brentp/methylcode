@@ -1,7 +1,8 @@
 import sys
 import os.path as op
+sys.path.insert(0, op.dirname(__file__))
 import os
-from methylcoder import is_up_to_date_b, CPU_COUNT, bin_paths_from_fasta, \
+from __init__ import is_up_to_date_b, CPU_COUNT, bin_paths_from_fasta, \
         get_counts, _update_conversions, write_files, write_sam_commands, \
         is_same_cmd
 from subprocess import Popen
