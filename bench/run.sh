@@ -9,20 +9,20 @@ source ./params.sh
 # methylcoder-bowtie
 #-------------------
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
-        --outdir methylcoder_bowtie --extra-args "-m 1" \
+        --outdir methylcoder_bowtie --extra-args "-m 1 --chunkmbs 256" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie.time
 
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
-        --outdir methylcoder_bowtie_2 --extra-args "-m 1" \
+        --outdir methylcoder_bowtie_2 --extra-args "-m 1 --chunkmbs 256" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie_2.time
 
 # methylcoder-gsnap
 #------------------
-/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}*/bin \
         --outdir methylcoder_gsnap --extra-args "--quiet-if-excessive --npaths 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap.time
 
-/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}/bin \
+/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}*/bin \
         --outdir methylcoder_gsnap_2 --extra-args "--quiet-if-excessive --npaths 1" \
         --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap_2.time
 
