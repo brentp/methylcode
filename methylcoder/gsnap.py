@@ -115,15 +115,13 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     fc, ft, fmethyltype = \
             bin_paths_from_fasta(fa.fasta_name, out_dir)
     counts = get_counts(fc, ft, fa)
-    chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
+    #chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
 
     print >>sys.stderr, "tabulating methylation"
-    gsnap_subset = open(gsnap_f.replace(".gsnap.sam", ".sam"), "w")
 
     for sline in open(gsnap_f):
         if sline.startswith("@SQ"):
-            print >>gsnap_subset, sline.strip()
             continue
 
         # the ends didn't map to same spot.
@@ -131,12 +129,9 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
         sam_flag = int(line[1])
         if paired_end:
             if line[6] != "=": continue
-            #print >>gsnap_subset, sline.strip()
         else:
             # no reported alignments.
             if sam_flag == 4: continue
-
-        print >>gsnap_subset, sline.rstrip("\n")
 
         seqid = line[2]
         aln_seq = line[9]
@@ -174,7 +169,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     print >>cmd, "#date:", str(datetime.date.today())
     print >>cmd, "#path:", op.abspath(".")
     print >>cmd, " ".join(sys.argv)
-    write_sam_commands(out_dir, fa, "methylcoder.gsnap")
+    write_sam_commands(out_dir, fa, "methylcoded.gsnap")
 
 
 def is_fastq(f):
