@@ -544,8 +544,8 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
     idxs, = np.where(cs + ts)
-    for bp, mt, c, t in izip((idxs, methylation_type[idxs],
-                                           cs[idxs], ts[idxs])):
+    for bp, mt, c, t in izip(idxs, methylation_type[idxs],
+                                           cs[idxs], ts[idxs]):
         assert mt > 0, (seqid, mt, bp, c, t)
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
