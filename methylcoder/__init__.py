@@ -138,14 +138,15 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
         cmd += " -1 %s -2 %s" % tuple(reads_list_c2t)
 
     cmd += " %(sam_out_file)s 2>&1 | tee %(out_dir)s/bowtie.log" % locals()
-    print >>sys.stderr, cmd.replace("//", "/")
+    cmd = cmd.replace("//", "/")
+    print >>sys.stderr, cmd
 
     if is_up_to_date_b(ref_path + ".1.ebwt", sam_out_file) and \
        is_up_to_date_b(reads_list_c2t[0], sam_out_file) and \
        is_same_cmd(cmd, sam_out_file + ".bowtie.sh"):
 
         print >>sys.stderr, "^ up to date, not running ^"
-        return sam_out_file
+        return open(sam_out_file)
 
     process = Popen(cmd, shell=True)
     print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
@@ -157,19 +158,28 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
                             " --phred64-quals)"
         sys.exit(1)
 
-    return sam_out_file
+    return open(sam_out_file)
 
+def write_new_header(out_sam, chr_lengths):
+    for seqid, len in chr_lengths.iteritems():
+        print >>out_sam, "@SQ\tSN:%s\tLN:%i" % (seqid, len)
+    print >>out_sam, "\t".join(["@PG", "ID:MethylCoder", "VN:%s" % __version__,
+                               "CL:\"%s\"" % " ".join(sys.argv)])
 
 # http://bowtie-bio.sourceforge.net/manual.shtml#sam-bowtie-output
-def parse_sam(sam_aln_file, chr_lengths, get_records, unmapped_name,
-              is_colorspace):
+def parse_sam(sam_iter, chr_lengths, get_records, unmapped_name,
+              is_colorspace, out_sam):
     is_colorspace = int(is_colorspace)
     unmapped = open(unmapped_name, "w")
     print >>sys.stderr, "writing unmapped reads to %s" % (unmapped.name, )
     idx = 0
-    for sline in open(sam_aln_file):
+    write_new_header(out_sam, chr_lengths)
+
+    for sline in sam_iter:
         # comment.
-        if sline[0] == "@": continue
+        if sline[0] == "@":
+            copy_header(out_sam, sline, chr_lengths)
+            continue
         line = sline.split("\t")
         read_id = line[0]
         sam_flag = int(line[1])
@@ -364,22 +374,14 @@ def get_counts(fcpatt, ftpatt, fa):
         counts[seqid] = tc
     return counts
 
-def copy_header(out_sam, sam_file, chr_lengths):
+def copy_header(out_sam, sam_line, chr_lengths):
     """when creating the new sam file, copy the header stuff from
     the original file"""
-    for seqid, len in chr_lengths.iteritems():
-        print >>out_sam, "@SQ\tSN:%s\tLN:%i" % (seqid, len)
-
-    # copy new header.
-    for line in open(sam_file):
-        if line[0] != "@": break
-        if line.startswith("@SQ"): continue
-        print >>out_sam, line.strip()
-    print >>out_sam, "\t".join(["@PG", "ID:MethylCoder", "VN:%s" % __version__,
-                               "CL:\"%s\"" % " ".join(sys.argv)])
+    if sam_line.startswith("@SQ"): return
+    print >>out_sam, sam_line.strip()
 
 
-def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, index_class, out_dir,
+def count_conversions(original_fasta, sam_iter, raw_reads_list, c2t_reads_list, index_class, out_dir,
                       allowed_mismatches, mode='w', counts=None, is_colorspace=False):
     print >>sys.stderr, "tabulating methylation for %s" % (original_fasta,)
 
@@ -397,7 +399,6 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
 
     out_sam = open(out_dir + "/methylcoded.sam", mode)
 
-    copy_header(out_sam, sam_file, chr_lengths)
 
     # get the 3 possible binary files for each chr
     fc, ft, fmethyltype = \
@@ -406,7 +407,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
     # if we're re-running without conversion, it was passed via kwargs.
     # otherwise, we get a new set.
     retry = counts is not None
-    unmapped_name = op.dirname(sam_file) +  "/unmapped.reads"
+    unmapped_name = op.join(out_dir, "unmapped.reads")
     if retry:
         unmapped_name += ".try2"
     else:
@@ -414,8 +415,10 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
 
     skipped = 0
     align_count = 0
-    for p, sam_line, read_len, direction in parse_sam(sam_file, chr_lengths,
-                                                      get_records, unmapped_name, is_colorspace):
+    for p, sam_line, read_len, direction in parse_sam(sam_iter, chr_lengths,
+                                                      get_records,
+                                                      unmapped_name,
+                                                      is_colorspace, out_sam):
 
         pairs = "CT" if direction == "f" else "GA" #
         read_id = p['read_id']
@@ -740,11 +743,11 @@ def main():
 
     try:
         bowtie_reads_flag = IndexClass.entry_class.bowtie_flag
-        sam = run_bowtie(opts, ref_base, c2t_reads_list, opts.extra_args, bowtie_reads_flag)
-        counts, unmatched = count_conversions(fasta, sam, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches, is_colorspace=is_colorspace)
+        sam_iter = run_bowtie(opts, ref_base, c2t_reads_list, opts.extra_args, bowtie_reads_flag)
+        counts, unmatched = count_conversions(fasta, sam_iter, read_paths, c2t_reads_list, IndexClass, opts.out_dir, opts.mismatches, is_colorspace=is_colorspace)
         if unconverted and len(c2t_reads_list) == 1 and sum(1 for _ in open(unmatched)) != 0:
-            sam = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
-            counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
+            sam_iter = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
+            counts, _ = count_conversions(fasta, sam_iter, (unmatched, ), (unmatched, ),  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts, is_colorspace=is_colorspace)
         write_files(fasta, opts.out_dir, counts, opts.write_bin)
     except:
