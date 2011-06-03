@@ -10,21 +10,21 @@ source ./params.sh
 #-------------------
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
         --outdir methylcoder_bowtie --extra-args "-m 1 --chunkmbs 256" \
-        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie.time
+        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder-bowtie.time
 
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
         --outdir methylcoder_bowtie_2 --extra-args "-m 1 --chunkmbs 256" \
-        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_bowtie_2.time
+        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder-bowtie-existing-index.time
 
 # methylcoder-gsnap
 #------------------
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}*/bin \
         --outdir methylcoder_gsnap --extra-args "--quiet-if-excessive --npaths 1" \
-        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap.time
+        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder-gsnap.time
 
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}*/bin \
         --outdir methylcoder_gsnap_2 --extra-args "--quiet-if-excessive --npaths 1" \
-        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder_gsnap_2.time
+        --mismatches=2 --reference $REF  $R1 $R2 2> methylcoder-gsnap-existing-index.time
 
 
 ##########
@@ -37,11 +37,11 @@ python bsseeker/Preprocessing_genome.py -f $REF -t N \
 
 /usr/bin/time -f "%M %U" \
 python bsseeker/BS_Seeker.py -p `pwd`/bowtie/bowtie-${BOWTIE_VERSION} -m 2 \
-                   -t N -o bsseeker.output -i $R1 2> bsseeker.map.time
+                   -t N -o bsseeker.output -i $R1 2> bsseeker.mapping.time
 
 /usr/bin/time -f "%M %U" \
 python bsseeker/BSSout2SAM.py -r $REF -f bsseeker.output > bsseeker/output.sam \
- 2> bsseeker.sam.time
+ 2> bsseeker.to-sam.time
 
 #######
 # bsmap
@@ -82,10 +82,10 @@ echo "brat_output/brat.out.nodupl" > brat_output/brat.out.list.nodupl
 /usr/bin/time -f "%M %U" \
 bismark/bismark_v${BISMARK_VERSION}/bismark_genome_preparation --yes \
     --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ \
-    `pwd`/`dirname $REF` 2>bismark_prep.time
+    `pwd`/`dirname $REF` 2>bismark.prep.time
 
 /usr/bin/time -f "%M %U" \
 bismark/bismark_v${BISMARK_VERSION}/bismark --chunkmbs 256 --fastq -1 $R1 \
-     -2 $R2 --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ \
+     -2 $R2 --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ --best \
      `pwd`/`dirname $REF` 2> bismark.time
 
