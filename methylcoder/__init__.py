@@ -723,7 +723,8 @@ def main():
 
     if opts.gsnap:
         import gsnap
-        gsnap.main(out_dir, fasta, read_paths, op.abspath(opts.gsnap), opts.extra_args)
+        gsnap.main(out_dir, fasta, read_paths, op.abspath(opts.gsnap),
+                opts.extra_args, opts.write_bin)
         sys.exit()
 
     opts.bowtie = op.abspath(opts.bowtie)

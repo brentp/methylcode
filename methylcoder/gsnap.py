@@ -109,7 +109,7 @@ def fastx_to_gsnap_fasta(reads, out_fa=sys.stdout):
                 read2(); read2()
     return out_fa.name
 
-def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
+def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     fa = Fasta(ref_path)
 
     fc, ft, fmethyltype = \
@@ -167,7 +167,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end):
                             counts[seqid]['c'], counts[seqid]['t'],
                             50, read_length, line[5])
 
-    write_files(fa.fasta_name, out_dir, counts)
+    write_files(fa.fasta_name, out_dir, counts, write_bin)
 
     cmd = open(out_dir +"/cmd.ran", "w")
     import datetime
@@ -183,7 +183,7 @@ def is_fastq(f):
     fh.close()
     return ifastq
 
-def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
+def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args, write_bin):
     fa_reads = out_dir + "/" + op.basename(reads[0]).rstrip("_1") + ".fasta"
     if all(is_fastq(r) for r in reads):
         print >>sys.stderr, "using existing reads files"
@@ -205,7 +205,7 @@ def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args):
     gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, gsnap_reads, cpu_count=CPU_COUNT)
     paired_end = len(reads) > 1
 
-    parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end)
+    parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end, write_bin)
 
 if __name__ == "__main__":
     import optparse
