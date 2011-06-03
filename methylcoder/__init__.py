@@ -498,7 +498,7 @@ def count_conversions(original_fasta, sam_file, raw_reads_list, c2t_reads_list, 
                   (skipped, 100.0 * skipped / (align_count or 1))
     return counts, unmapped_name
 
-def write_files(original_fasta, out_dir, counts):
+def write_files(original_fasta, out_dir, counts, write_bin):
     fa = Fasta(original_fasta)
     fc, ft, fmethyltype = \
             bin_paths_from_fasta(original_fasta, out_dir)
@@ -525,9 +525,10 @@ def write_files(original_fasta, out_dir, counts):
 
         print_summary(seqid, cs, ts, mtype, summary_counts, f_summary, print_header=(i==0))
 
-        cs.tofile(fc % seqid)
-        ts.tofile(ft % seqid)
-        mtype.tofile(fmethyltype % seqid)
+        if write_bin:
+            cs.tofile(fc % seqid)
+            ts.tofile(ft % seqid)
+            mtype.tofile(fmethyltype % seqid)
 
         to_text_file(cs, ts, mtype, seqid, out)
 
@@ -688,6 +689,10 @@ def main():
                  "unconverted genome in addtion to mapping c2t reads against"
                  " c2t genome. only works for un-paired reads.")
 
+    p.add_option("--bin", dest="write_bin", action="store_true", default=False,
+            help="write binary files for efficient access. default is false"
+            " text and SAM files are still written")
+
     p.add_option("--extra-args", dest="extra_args", default="",
                  help="any extra arguments to pass directly to bowtie. must "
                  " be specified inside a string. e.g.: "
@@ -740,7 +745,7 @@ def main():
             sam = run_bowtie(opts, ref_base, (unmatched, ), opts.extra_args, bowtie_reads_flag)
             counts, _ = count_conversions(fasta, sam, (unmatched, ), (unmatched, ),  IndexClass,
                                           opts.out_dir, opts.mismatches, mode='a', counts=counts, is_colorspace=is_colorspace)
-        write_files(fasta, opts.out_dir, counts)
+        write_files(fasta, opts.out_dir, counts, opts.write_bin)
     except:
         files = bin_paths_from_fasta(fasta, opts.out_dir, pattern_only=True)
         for f in glob.glob(files):
