@@ -1,5 +1,24 @@
-import bsddb
 import os
+try:
+    import bsddb
+    def get_db(dbname, mode):
+        return bsddb.btopen(dbname, mode, cachesize=32768*2,
+                          pgsize=512)
+
+except ImportError:
+    from tcdb.bdb import BDBSimple as BDB
+    import tcdb.bdb as tc
+
+    def get_db(dbname, mode):
+        db = BDB()
+        if mode in 'cn':
+            db.open(dbname,
+                    omode=tc.OWRITER | tc.OTRUNC | tc.OCREAT,
+                    bnum=int(1e7), lcnum=2**19,
+                    apow=6, opts=tc.TLARGE, xmsiz=2**26)
+        else:
+            db.open(dbname, omode=tc.OREADER)
+        return db
 
 def is_up_to_date_b(a, b):
     if not os.path.exists(b): return False
@@ -74,14 +93,10 @@ class FastQIndex(object):
     @classmethod
     def create(cls, filename, get_next_pos):
         fh = open(filename)
-        lines = sum(1 for line in fh)
-        bnum = lines if lines > 2**24 else lines * 2
-        fh.seek(0)
         # iterate past comment lines.
         advance_file_handle_past_comments(fh)
 
-        db = bsddb.btopen(filename + cls.ext, 'n', cachesize=32768*2,
-                          pgsize=512)
+        db = get_db(filename + cls.ext, 'n')
         while True:
             # fh has been moved forward by get_next.
             pos = fh.tell()
@@ -100,10 +115,9 @@ class FastQIndex(object):
             except:
                 os.unlink(self.filename + self.ext)
                 raise
-        self.db = bsddb.btopen(filename + self.ext, 'r')
+        self.db = get_db(filename + self.ext, 'r')
 
     def __getitem__(self, key):
-        # every key has the | appended.
         pos = self.db.get(key, None)
         if pos is None: raise KeyError(key)
         self.fh.seek(long(pos))

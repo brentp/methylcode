@@ -17,7 +17,6 @@ NOTE: it is highly recommended to use -m 1 to ensure unique mappings.
 """
 from pyfasta import Fasta
 import numpy as np
-import bsddb
 import sys
 import os.path as op
 sys.path.insert(0, op.dirname(__file__))
@@ -25,7 +24,8 @@ import os
 from subprocess import Popen
 from calculate_methylation_points import calc_methylation
 from cbowtie import _update_conversions, seq2cs, cs2seq
-from fastqindex import guess_index_class, advance_file_handle_past_comments
+from fastqindex import guess_index_class, advance_file_handle_past_comments,\
+        get_db
 import string
 import glob
 from itertools import izip
@@ -596,7 +596,7 @@ def convert_reads_c2t(reads_path, ga=False, is_colorspace=False):
 
     try:
         out = open(c2t, 'wb')
-        db = bsddb.btopen(idx, 'n', cachesize=32768*2, pgsize=512)
+        db = get_db(idx, 'n')
 
         fh_fq = open(reads_path)
         advance_file_handle_past_comments(fh_fq, out)
