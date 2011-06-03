@@ -28,6 +28,7 @@ from cbowtie import _update_conversions, seq2cs, cs2seq
 from fastqindex import guess_index_class, advance_file_handle_past_comments
 import string
 import glob
+from itertools import izip
 import datetime
 np.seterr(divide="ignore")
 
@@ -540,7 +541,7 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
     idxs, = np.where(cs + ts)
-    for bp, mt, c, t in np.column_stack((idxs, methylation_type[idxs],
+    for bp, mt, c, t in izip((idxs, methylation_type[idxs],
                                            cs[idxs], ts[idxs])):
         assert mt > 0, (seqid, mt, bp, c, t)
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
