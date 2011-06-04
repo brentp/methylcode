@@ -15,7 +15,11 @@ mkdir -p bsseeker && \
 cd bsseeker
 wget http://pellegrini.mcdb.ucla.edu/BS_Seeker/BS_Seeker_files/BS_SEEKER.tgz
 tar xzvf BS_SEEKER.tgz
-cd ../
+# bsseeker needs pysam
+hg clone https://pysam.googlecode.com/hg/ pysam-hg
+cd pysam-hg && sudo python setup.py install
+cd ../../
+
 
 mkdir -p bismark
 cd bismark
@@ -71,7 +75,8 @@ perl -pi -e "s/^>([^\s]+).*/>\1/;tr/C/c/" thaliana_v10.fasta
 cd ../
 
 mkdir reads/
-wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.1.fastq | head -n 5000000 > reads/WT_endosperm_BS_seq_raw_batch-2.1.fastq
-wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.2.fastq | head -n 5000000 > reads/WT_endosperm_BS_seq_raw_batch-2.2.fastq
+wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.1.fastq > reads/WT_endosperm_1.fastq
+wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosperm_BS_seq_raw_batch-2.2.fastq > reads/WT_endosperm_2.fastq
 
-python scripts/fastq_pair_filter.py -t 20 -l 32 reads/WT_endosperm_BS_seq_raw_batch-2.1.fastq reads/WT_endosperm_BS_seq_raw_batch-2.2.fastq
+python scripts/fastq_pair_filter.py -t 20 -l 32 reads/WT_endosperm_1.fastq reads/WT_endosperm_2.fastq
+
