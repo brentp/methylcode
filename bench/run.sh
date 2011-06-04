@@ -10,12 +10,12 @@ source ./params.sh
 # directory to save the timings.
 rm -rf bench-results/
 mkdir -p bench-results/
-rm reads/*.c2t* reads/*.txt
+rm -f reads/*.c2t* reads/*.txt
 
 mv $REF ./t.fasta
 rm -rf reference/*
 mv ./t.fasta $REF
-rm ./reference_genome # bsseeker.
+rm -rf ./reference_genome # bsseeker.
 rm -rf brat_output/
 rm -rf methylcoder_bowtie methylcoder_bowtie_2 methylcoder_gsnap methylcoder_gsnap_2
 
@@ -25,6 +25,7 @@ rm -rf methylcoder_bowtie methylcoder_bowtie_2 methylcoder_gsnap methylcoder_gsn
 
 # methylcoder-bowtie
 #-------------------
+
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
         --outdir methylcoder_bowtie --extra-args "-m 1 --chunkmbs 256" \
         --mismatches=2 --reference $REF $R1 $R2 2> bench-results/methylcoder-bowtie.time
@@ -77,13 +78,20 @@ bsmap/bsmap-${BSMAP_VERSION}/bsmap -a $R1 -b $R2 -d $REF -o bsmap/output.sam \
 
 mkdir -p brat_output/
 
+# brat requires each chr in a seperate file.
+pyfasta split $REF --header "reference/%(seqid)s.single.fasta"
+mkdir -p brat_output/
+ls reference/*.single.fasta > brat_output/ref.txt
+
+
 /usr/bin/time -f "%M %U" \
 brat/brat-${BRAT_VERSION}/trim -1 $R1 -2 $R2 -P brat_output/reads -L 33 -m 21 2> bench-results/brat.trim.time
-echo "$REF" > brat_output/ref.txt
 
 /usr/bin/time -f "%M %U" \
 brat/brat-${BRAT_VERSION}/brat -r brat_output/ref.txt -o brat_output/brat.out \
-      -pe -1 brat_output/reads_reads1.txt -2 brat_output/reads_reads2.txt -bs -m 2 2> bench-results/brat.time
+      -i 0 -a 300 -m 2 -pe -bs \
+      -1 brat_output/reads_reads1.txt \
+      -2 brat_output/reads_reads2.txt 2> bench-results/brat.time
 
 echo "brat_output/brat.out" > brat_output/brat.out.list
 /usr/bin/time -f "%M %U" \
