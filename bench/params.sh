@@ -7,8 +7,8 @@ GSNAP_VERSION=2011-03-28
 
 FASTX_VERSION=0.0.13
 
-R1=reads/WT_endosperm_1.fastq.trim
-R2=reads/WT_endosperm_2.fastq.trim
+R1=reads/endosperm_1.fastq.trim
+R2=reads/endosperm_2.fastq.trim
 REF=reference/thaliana_v10.fasta
 
 PROCESSORS=8

@@ -80,3 +80,6 @@ wget -O - http://dzlab.pmb.berkeley.edu:8080/work/GEO_submission/raw/WT_endosper
 
 python scripts/fastq_pair_filter.py -t 20 -l 32 reads/WT_endosperm_1.fastq reads/WT_endosperm_2.fastq
 
+# we will do 5 million trimmed, filtered. reads for benchmarking
+head -n 20000000 reads/WT_endosperm_1.fastq.trim > reads/endosperm_1.fastq.trim
+head -n 20000000 reads/WT_endosperm_2.fastq.trim > reads/endosperm_2.fastq.trim
