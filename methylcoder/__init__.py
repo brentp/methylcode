@@ -735,10 +735,10 @@ def main():
     pc2t = run_bowtie_builder(opts.bowtie, fr_c2t, is_colorspace)
     punc = run_bowtie_builder(opts.bowtie, fr_unc, is_colorspace)  if unconverted else None
 
-    if pc2t and pc2t.wait() != 0: sys.exit(1)
-    if punc and punc.wait() != 0: sys.exit(1)
 
     IndexClass, c2t_reads_list = get_index_and_c2t(read_paths, is_colorspace)
+    if pc2t and pc2t.wait() != 0: sys.exit(1)
+    if punc and punc.wait() != 0: sys.exit(1)
 
     ref_base = op.splitext(fr_c2t)[0]
 
