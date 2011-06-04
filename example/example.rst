@@ -273,7 +273,11 @@ Now `counts.bed` will look something like::
 
 indicating that AT1G01010 has 6 methylated Cytosines. 
 This BED file can be entered in a genome-browser to get a visual idea of the differences.
+Here is a view of these files in `IGV`_
 
+.. image:: https://github.com/brentp/methylcode/raw/master/example/images/igv_counts.png
+
+There we can see the differences and similarities between the tissues.
 
 Join the Groups
 ***************
@@ -501,3 +505,4 @@ in the benchmarks/scripts directory.
 .. _`groupby`: https://github.com/arq5x/filo
 .. _`fisher`: http://pypi.python.org/pypi/fisher
 .. _`BED`: http://genome.ucsc.edu/FAQ/FAQformat.html#format1
+.. _`IGV`: http://www.broadinstitute.org/igv/
