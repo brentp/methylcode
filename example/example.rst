@@ -50,12 +50,13 @@ We will use TAIR version 10 as the reference genome::
     # fix the chromosome names.
     perl -pi -e "s/^>([^\s]+).*/>\1/;tr/C/c/" $REF
 
-
+That simply downloads the chromosomal Fasta files and puts them in a single reference.
 For later analysis, we also want to download the annotations::
 
     wget -O reference/arabidopsis_thaliana.gff ftp://ftp.arabidopsis.org/home/tair/Genes/TAIR10_genome_release/TAIR10_gff3/TAIR10_GFF3_genes.gff
    
-And for simplicity, we will convert that to a BED file with only chrom, start, end, name of the genes.
+And for simplicity, we will convert that to a `BED`_ file with only the chrom, start, end, and name of
+the genes.
 This analysis can also be done on exons, UTRs or any feature. We will use an awk script to convert
 from GFF to BED.::
 
@@ -81,7 +82,7 @@ The rows in thaliana.genes.bed look like::
     chr1    28499   28706   AT1G01046
     chr1    31169   33153   AT1G01050
 
-.. note:: for many organisms. Comprehensive BED annotation files are available from the `UCSC`_ genome browser.
+.. note:: for many organisms. Comprehensive `BED`_ annotation files are available from the `UCSC`_ genome browser.
 
 
 Getting The Reads
@@ -132,7 +133,7 @@ The resulting files `*.fastq.trim` will be filtered and trimmed.
 Aligning with MethylCoder
 =========================
 
-Here we send the trim reads to MethylCoder for alignment. We will use bowtie
+Here we send the **trimmed** reads to MethylCoder for alignment. We will use bowtie
 as the aligner, but we could as easily use GSNAP.  ::
 
      
@@ -499,3 +500,4 @@ in the benchmarks/scripts directory.
 .. _`amigo`: http://amigo.geneontology.org/cgi-bin/amigo/term_enrichment
 .. _`groupby`: https://github.com/arq5x/filo
 .. _`fisher`: http://pypi.python.org/pypi/fisher
+.. _`BED`: http://genome.ucsc.edu/FAQ/FAQformat.html#format1
