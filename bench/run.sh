@@ -2,11 +2,9 @@
 
 source ./params.sh
 
-
 ##################
 # cleanup and prep
 ##################
-
 # directory to save the timings.
 rm -rf bench-results/
 mkdir -p bench-results/
@@ -40,15 +38,12 @@ rm -rf methylcoder_bowtie methylcoder_bowtie_2 methylcoder_gsnap methylcoder_gsn
         --outdir methylcoder_gsnap --extra-args "--quiet-if-excessive --npaths 1" \
         --mismatches=2 --reference $REF $R1 $R2 2> bench-results/methylcoder-gsnap.time
 
-/usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --gsnap gsnap/gmap-${GSNAP_VERSION}*/bin \
-        --outdir methylcoder_gsnap_2 --extra-args "--quiet-if-excessive --npaths 1" \
-        --mismatches=2 --reference $REF $R1 $R2 2> bench-results/methylcoder-gsnap-existing-index.time
-
-
 ##########
 # bsseeker
 ##########
-
+<<EXCLUDE 
+# bsseeker does not do paired end. so remove it from the benchmark for now.
+# the below will still run it on single-end reads.
 /usr/bin/time -f "%M %U" \
 python bsseeker/Preprocessing_genome.py -f $REF -t N \
         -p `pwd`/bowtie/bowtie-${BOWTIE_VERSION} 2> bench-results/bsseeker.preprocess.time
@@ -63,7 +58,7 @@ python bsseeker/BS_Seeker.py -p `pwd`/bowtie/bowtie-${BOWTIE_VERSION} -m 2 \
 python bsseeker/BSSout2SAM.py -r $REF -f bsseeker/bsseeker.output > bsseeker/output.sam \
  2> bsseeker.to-sam.time
 BROKEN
-
+EXCLUDE
 #######
 # bsmap
 #######
@@ -109,9 +104,11 @@ bismark/bismark_v${BISMARK_VERSION}/bismark_genome_preparation --yes \
     --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ \
     `pwd`/`dirname $REF` 2>bench-results/bismark.prep.time
 
+# remove the singles otherwise bismark includes them.
+rm -f reference/*.single.fasta
 /usr/bin/time -f "%M %U" \
 bismark/bismark_v${BISMARK_VERSION}/bismark --chunkmbs 256 --fastq -1 $R1 \
-     -2 $R2 --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ --best \
+     -2 $R2 --path_to_bowtie `pwd`/bowtie/bowtie-${BOWTIE_VERSION}/ \
      `pwd`/`dirname $REF` 2> bench-results/bismark.time
 
 ############
@@ -119,7 +116,7 @@ bismark/bismark_v${BISMARK_VERSION}/bismark --chunkmbs 256 --fastq -1 $R1 \
 ############
 
 
-wc -l bsseeker/bsseeker.output | awk '{ print $1 / 2 }' > bench-results/bsseeker.count
+#wc -l bsseeker/bsseeker.output | awk '{ print $1 / 2 }' > bench-results/bsseeker.count
 wc -l ${R1}_bismark_pe.txt | awk '{ print $0 - 1 }' > bench-results/bismark.count
 samtools view -F 0x4 -F 0x100 -S bsmap/output.sam | grep -c "=" | awk '{ print $0 / 2 }' > bench-results/bsmap.count
 samtools view -F 0x04 -S methylcoder_gsnap/methylcoded.gsnap.sam | grep -c "=" | awk '{ print $0 / 2 }' > bench-results/methylcoder-gsnap.count
