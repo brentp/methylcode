@@ -39,8 +39,9 @@ def make_table(time_files, directory):
     print row_format % ("program", "process", "memory (MB)", "time (minutes)",
                                                                 "pairs-mapped")
     print header_string
-    for group, li in itertools.groupby(sorted(tails), lambda a: a[0].split(".")[0]):
-        group = "-".join(group.split("-")[:2])
+    info = {}
+    for full_group, li in itertools.groupby(sorted(tails), lambda a: a[0].split(".")[0]):
+        group = "-".join(full_group.split("-")[:2])
         li = list(li)
         if len(li) == 1: group = "*%s*" % group
         count = get_count(group, directory) if len(li) == 1 else ""
@@ -50,13 +51,35 @@ def make_table(time_files, directory):
                     str(count))
 
         count = get_count(group, directory)
-        if len(li) > 1:
-            max_mem = max(ms[1][0] for ms in li)
-            total_time = sum(ms[1][1] for ms in li)
+        max_mem = max(ms[1][0] for ms in li)
+        total_time = sum(ms[1][1] for ms in li)
+        info[group] = {'count': count, 'mem': max_mem, 'time': total_time }
 
+        if len(li) > 1:
             print row_format % ("*%s*"%  group, "total", "%s" % max_mem, "%.1f"
                     % total_time, str(count))
     print header_string
+    return info
+
+GCE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-.'
+
+def encode(numbers, GCE=GCE):
+    """
+    do extended encoding on a list of numbers for the google chart api
+    >>> encode([1690, 90,1000])
+    'chd=e:aaBaPo'
+    """
+    encoded = []
+    for number in numbers:
+        if number > 4095: raise ValueError('too large')
+        first, second = divmod(number, len(GCE))
+        encoded.append("%s%s" % (GCE[first], GCE[second]))
+    return "chd=e:%s" % ''.join(encoded)
+
+
+def make_chart_urls(info):
+    url= 'https://chart.googleapis.com/chart?cht=bvs&chs=200x125&'
+
 
 
 
@@ -69,7 +92,8 @@ def main():
 
     directory = args[0]
     time_files = glob.glob(op.join(directory, "*.time"))
-    make_table(time_files, directory)
+    info = make_table(time_files, directory)
+    make_chart_urls(info)
 
 
 if __name__ == "__main__":
