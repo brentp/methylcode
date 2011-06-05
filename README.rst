@@ -166,8 +166,8 @@ to be paired-end reads.
 Limitations
 ===========
 
-  + when using bowtie, the reference size must be <= 1.8 Gigabases. This
-    limitation can be circumvented by splitting the reference into 2 smaller
+  + when using bowtie, the reference size must be less than about 2 Gigabases.
+    This limitation can be circumvented by splitting the reference into 2 smaller
     reference sequences. For example with human, splitting into 2 fasta files,
     one with chromosomes 1-9 and the other with chromosomes 10+ works well.
     This limitation does not exist when GSNAP is used as the aligner.
