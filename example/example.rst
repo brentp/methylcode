@@ -326,7 +326,7 @@ The resulting table in `embryo.endosperm.sig.genes.txt` contains 191 genes
 with an adjusted p-value of less than 0.05. These can be sent to a web service
 like `amigo`_ to look for gene ontology enrichment. 
 For this set, we find that only `GO:0003825 alpha,alpha-trehalose-phosphate synthase (UDP-forming) activity`
-is over-represented and not at a significant level. 
+is over-represented and not at a significant level.
 From here, we may want to change the 0.4 cutoff used above, we may try using only exons, or,
 we may look in the upstream or 5' UTR region of the gene. For any of those analyses, we will
 create a BED file and follow the steps above.
@@ -460,7 +460,18 @@ For this geneset, we find the following enrichments::
     GO:0003825 alpha,alpha-trehalose-phosphate synthase (UDP-forming) activity       5.25e-04
     GO:0000049 tRNA binding  1.25e-02
 
-With the final column indicating the p-value of the enrichment. 
+With the final column indicating the p-value of the enrichment. Note that
+the `GO:0003825` is the same term we found with DESeq.
+Trehalose stabilizes proteins in drought stressed plants; seeds experience
+dehydration during embryogenesis. The trehalose may protect the seeds
+during that time::
+
+    Eastmond P. et al. (2002) Trehalose-6-phosphate synthase 1, which catalyses
+    the first step in trehalose synthesis, is essential for Arabidopsis embryo
+    maturation. The Plant Journal. 29: 225-235.
+
+So this preliminary analysis has uncovered a meaningful result.
+
 We could continue this analysis with other cutoffs in the fisher test or by
 looking at promotor methylation. Again, the workflow would remain the same,
 only the annotation BED file would differ.
@@ -468,10 +479,12 @@ only the annotation BED file would differ.
 Installing Software
 ===================
 
-Much of the software used in this example can be installed following the instructions here 
-Note that not all of that is needed for this example.
+Much of the software used in this example can be installed following the
+instructions here:
 
 https://github.com/brentp/methylcode/blob/master/bench/get.sh
+
+Note that not all of that is needed for this example.
 
 Bedtools can be installed as::
 
