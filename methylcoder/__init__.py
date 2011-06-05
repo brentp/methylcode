@@ -146,11 +146,18 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
        is_same_cmd(cmd, sam_out_file + ".bowtie.sh"):
 
         print >>sys.stderr, "^ up to date, not running ^"
-        return open(sam_out_file)
+        #return open(sam_out_file)
+        process = None
+    else:
+        process = Popen(cmd, shell=True)
+        print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
+        # hacky, but just wait for bowtie to generate some results, then run.
+        import time
+        time.sleep(20)
 
-    process = Popen(cmd, shell=True)
-    print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
-    ret = process.wait()
+    for line in open(sam_out_file):
+        yield line
+    ret = (process and process.wait()) or 0
     log_txt = open("%(out_dir)s/bowtie.log" % locals()).read()
     if ret != 0 or ' re-run' in log_txt or 'terminate' in log_txt:
         os.unlink(sam_out_file)
@@ -158,7 +165,6 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
                             " --phred64-quals)"
         sys.exit(1)
 
-    return open(sam_out_file)
 
 def write_new_header(out_sam, chr_lengths):
     for seqid, len in chr_lengths.iteritems():
@@ -544,9 +550,9 @@ def to_text_file(cs, ts, methylation_type, seqid, out=sys.stdout):
     seqid [TAB] methylation_type [TAB] bp(0) [TAB] cs [TAB] ts
     """
     idxs, = np.where(cs + ts)
+    assert np.all(methylation_type[idxs] != 0)
     for bp, mt, c, t in izip(idxs, methylation_type[idxs],
                                            cs[idxs], ts[idxs]):
-        assert mt > 0, (seqid, mt, bp, c, t)
         print >>out, "\t".join(map(str, (seqid, mt, bp, c, t)))
 
 def write_sam_commands(out_dir, fasta, fname="methylcoded"):
