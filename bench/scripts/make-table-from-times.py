@@ -33,8 +33,8 @@ def make_table(time_files, directory):
     longest = sorted(tails, key=lambda a: len(a[0]))[-1][0]
     llen = len(longest)
     sep = "=" * 19
-    row_format = "%21s %" + str(llen) + "s %19s %19s %19s"
-    header_string = "%s %s %s %s %s" % ("=" * 21, "=" * (llen + 3), sep, sep, sep)
+    row_format = "%22s %" + str(llen) + "s %19s %19s %19s"
+    header_string = "%s %s %s %s %s" % ("=" * 22, "=" * (llen + 3), sep, sep, sep)
     print header_string
     print row_format % ("program", "process", "memory (MB)", "time (minutes)",
                                                                 "pairs-mapped")
@@ -43,7 +43,7 @@ def make_table(time_files, directory):
     for full_group, li in itertools.groupby(sorted(tails), lambda a: a[0].split(".")[0]):
         group = "-".join(full_group.split("-")[:2])
         li = list(li)
-        if len(li) == 1: group = "*%s*" % group
+        if len(li) == 1: group = "**%s**" % group
         count = get_count(group, directory) if len(li) == 1 else ""
         for name, (mem, seconds) in li:
             name = "-".join(name.split("-")[-2:])
@@ -56,7 +56,7 @@ def make_table(time_files, directory):
         info[group] = {'count': count, 'mem': max_mem, 'time': total_time }
 
         if len(li) > 1:
-            print row_format % ("*%s*"%  group, "total", "%s" % max_mem, "%.1f"
+            print row_format % ("**%s**"%  group, "total", "%1.f" % max_mem, "%.1f"
                     % total_time, str(count))
     print header_string
     return info

@@ -82,6 +82,27 @@ Results
 .. note:: these are preliminary results and will be updated as feedback
           is received.
 
+If the program contains multiple steps, the highest memory usage and sum
+of the processor time across the steps is reported in the row with 'total'
+in the *process* column. In addition, in the *total* rows, the *program*
+name appears in bold.
+
+.. note:: the brat data will be added shortly.
+
+
+====================== ==================================== =================== =================== ===================
+               program                           process         memory (MB)      time (minutes)        pairs-mapped
+====================== ==================================== =================== =================== ===================
+               bismark                           bismark                1033               730.7                    
+               bismark                      bismark.prep                1864                43.2                    
+           **bismark**                             total                1864               773.8             2035400
+              **brat**                             total                5688                95.8                   0
+             **bsmap**                             bsmap                2556               349.6             2408400
+**methylcoder-bowtie**                methylcoder-bowtie                4976               213.5             1722060
+ **methylcoder-gsnap**                 methylcoder-gsnap                5460               941.3             2649210
+====================== ==================================== =================== =================== ===================
+
+
 
 Suggestions
 ===========
