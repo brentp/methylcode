@@ -56,7 +56,10 @@ tar xvf fastx_toolkit-${FASTX_VERSION}.tar
 cd fastx_toolkit-${FASTX_VERSION} && CC=gcc-4.4 ./configure && make && sudo make install
 cd ../../
 
-
+mkdir pyfasta && cd pyfasta
+wget http://pypi.python.org/packages/source/p/pyfasta/pyfasta-0.4.3.tar.gz
+tar xzvf pyfasta-0.4.3.tar.gz && cd pyfasta-0.4.3 && sudo python setup.py install
+cd ../../
 
 mkdir -p bsmap && cd bsmap
 wget http://bsmap.googlecode.com/files/bsmap-${BSMAP_VERSION}.tgz
