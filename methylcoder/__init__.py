@@ -152,12 +152,12 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
         process = Popen(cmd, shell=True)
         print >> open(sam_out_file + ".bowtie.sh", "w"), cmd
         # hacky, but just wait for bowtie to generate some results, then run.
-        import time
-        time.sleep(20)
+        #import time
+        #time.sleep(20)
 
+    ret = (process and process.wait()) or 0
     for line in open(sam_out_file):
         yield line
-    ret = (process and process.wait()) or 0
     log_txt = open("%(out_dir)s/bowtie.log" % locals()).read()
     if ret != 0 or ' re-run' in log_txt or 'terminate' in log_txt:
         os.unlink(sam_out_file)
