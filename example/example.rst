@@ -105,8 +105,8 @@ compare wild-type embryo tissue to wild-type endosperm::
 
     done
 
-.. note:: This is a *lot* of data, if may be sufficient to download the
-   first batch (replace the for loop with `for i in 1`
+.. note:: This is a *lot* of data, it may be sufficient to download the
+   first batch (replace the for loop with `for i in 1`)
 
 Trimming and Filtering The Reads
 ================================
@@ -180,7 +180,7 @@ Downstream Analysis
 ===================
 
 We will use some linux tools to transform the simple output data to BED format
-so we can utilize some common bioinformatics tools. Namely we will used `bedtools`_
+so we can utilize some common bioinformatics tools. Namely we will use `bedtools`_
 to intersect, merge, and group the data.
 
 
@@ -215,14 +215,14 @@ Those methylation.bed files will now contain rows like: ::
     chr1    321     322     0
     chr1    322     323     0
 
-here the final columm indicates wether the base described by the
+where the final columm indicates wether the base described by the
 first 3 columns is methylated according to our cutoff. 
 
 
 Intersect with Genes
 ********************
 
-We will now intersect this file with are BED annotation file to
+We will now intersect this file with our BED annotation file to
 get all methylation data associated with a gene. We will do this 
 by chromosome to reduce memory usage since the methylation.bed files
 are quite large with 1 row for every C or G in the reference genome.::
@@ -294,8 +294,9 @@ out the columns we need.::
 DESeq
 *****
 
-This file is now in a format we can use with the `R`_ package `DESeq`_ which generally used to
-find differential expression for RNA-Seq data, but can be applied to any count data.
+This file is now in a format we can use with the `R`_ package `DESeq`_ which is
+generally used to find differential expression for RNA-Seq data, but can be
+applied to any count data.
 
 .. note:: DESeq is best used with biological replicates
 
