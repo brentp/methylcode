@@ -89,18 +89,20 @@ name appears in bold.
 
 .. note:: the brat data will be added shortly.
 
-
-====================== ==================================== =================== =================== ===================
-               program                           process         memory (MB)      time (minutes)        pairs-mapped
-====================== ==================================== =================== =================== ===================
-               bismark                           bismark                1033               730.7                    
-               bismark                      bismark.prep                1864                43.2                    
-           **bismark**                             total                1864               773.8             2035400
-              **brat**                             total                5688                95.8                   0
-             **bsmap**                             bsmap                2556               349.6             2408400
-**methylcoder-bowtie**                methylcoder-bowtie                4976               213.5             1722060
- **methylcoder-gsnap**                 methylcoder-gsnap                5460               941.3             2649210
-====================== ==================================== =================== =================== ===================
+====================== ===================== =================== =================== ===================
+               program            process         memory (MB)      time (minutes)        pairs-mapped
+====================== ===================== =================== =================== ===================
+               bismark            bismark                1033               730.7                    
+               bismark       bismark.prep                1864                43.2                    
+           **bismark**              total                1864               773.8             2035400
+                  brat               brat                7254                13.1                    
+                  brat         brat.count                2921                 2.1                    
+                  brat          brat.trim                   5                 0.3                    
+              **brat**              total                7254                15.5             1872932
+             **bsmap**              bsmap                2556               349.6             2408400
+**methylcoder-bowtie** methylcoder-bowtie                4976               213.5             2029439
+ **methylcoder-gsnap**  methylcoder-gsnap                5460               941.3             2649210
+====================== ===================== =================== =================== ===================
 
 
 
