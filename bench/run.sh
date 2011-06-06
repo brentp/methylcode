@@ -121,5 +121,6 @@ wc -l ${R1}_bismark_pe.txt | awk '{ print $0 - 1 }' > bench-results/bismark.coun
 samtools view -F 0x4 -F 0x100 -S bsmap/output.sam | grep -c "=" | awk '{ print $0 / 2 }' > bench-results/bsmap.count
 samtools view -F 0x04 -S methylcoder_gsnap/methylcoded.gsnap.sam | grep -c "=" | awk '{ print $0 / 2 }' > bench-results/methylcoder-gsnap.count
 samtools view -c -F 0x4  -S methylcoder_bowtie/methylcoded.sam | awk '{ print $0 / 2 }' > bench-results/methylcoder-bowtie.count
+wc -l brat_output/brat.out | awk '{ print $1  }' > bench-results/brat.count
 
 python scripts/make-table-from-times.py bench-results/
