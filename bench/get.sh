@@ -56,6 +56,12 @@ tar xvf fastx_toolkit-${FASTX_VERSION}.tar
 cd fastx_toolkit-${FASTX_VERSION} && CC=gcc-4.4 ./configure && make && sudo make install
 cd ../../
 
+NPY_VERSION=1.6.0rc3
+mkdir -p numpy && cd numpy
+wget -O numpy-v${NPY_VERSION}.zip https://github.com/numpy/numpy/zipball/v1.6.0rc3
+unzip numpy-v${NPY_VERSION}.zip && cd numpy*/ && sudo python setup.py install
+cd ../../
+
 mkdir pyfasta && cd pyfasta
 wget http://pypi.python.org/packages/source/p/pyfasta/pyfasta-0.4.3.tar.gz
 tar xzvf pyfasta-0.4.3.tar.gz && cd pyfasta-0.4.3 && sudo python setup.py install

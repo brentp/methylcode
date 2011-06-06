@@ -25,11 +25,11 @@ rm -rf methylcoder_bowtie methylcoder_bowtie_2 methylcoder_gsnap methylcoder_gsn
 #-------------------
 
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
-        --outdir methylcoder_bowtie --extra-args "-m 1 --chunkmbs 256" \
+        --outdir methylcoder_bowtie --extra-args "-m 2 --chunkmbs 256" \
         --mismatches=2 --reference $REF $R1 $R2 2> bench-results/methylcoder-bowtie.time
 
 /usr/bin/time -f "%M %U" python ../methylcoder/__init__.py --bowtie bowtie/bowtie-${BOWTIE_VERSION} \
-        --outdir methylcoder_bowtie_2 --extra-args "-m 1 --chunkmbs 256" \
+        --outdir methylcoder_bowtie_2 --extra-args "-m 2 --chunkmbs 256" \
         --mismatches=2 --reference $REF $R1 $R2 2> bench-results/methylcoder-bowtie-existing-index.time
 
 # methylcoder-gsnap
