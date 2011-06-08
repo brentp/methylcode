@@ -563,10 +563,8 @@ def write_sam_commands(out_dir, fasta, fname="methylcoded"):
     out = open("%s/commands.sam.sh" % out_dir, "w")
     print >> out, """\
 SAMTOOLS=/usr/local/src/samtools/samtools
-# 0x0004 takes only the aligned reads.
-$SAMTOOLS view -bS -F 0x0004 %(odir)s/%(fname)s.sam \
-        -o %(odir)s/%(fname)s.unsorted.bam
-$SAMTOOLS sort %(odir)s/%(fname)s.unsorted.bam %(odir)s/%(fname)s # suffix added
+# 0x4 takes only the aligned reads.
+$SAMTOOLS view -h -bS -F 0x4 | $SAMTOOLS sort - %(odir)/%(fname)s
 $SAMTOOLS index %(odir)s/%(fname)s.bam
 # TO view:
 # $SAMTOOLS tview %(odir)s/%(fname)s.bam %(fapath)s
@@ -725,7 +723,7 @@ def main():
 
     out_dir = opts.out_dir = get_out_dir(opts.out_dir, read_paths)
     fasta = get_fasta(opts)
-    reads_paths = [op.abspath(r) for r in read_paths]
+    read_paths = [op.abspath(r) for r in read_paths]
 
     if opts.gsnap:
         import gsnap
