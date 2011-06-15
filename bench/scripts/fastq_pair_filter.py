@@ -103,6 +103,7 @@ if __name__ == "__main__":
     p.add_option("--sanger", dest="sanger", help="quality scores are ascii 33 sanger encoded (default is 64)", action="store_true")
 
     opts, fastqs = p.parse_args()
+    fastqs[-1] = fastqs[-1].rstrip()
     if not (fastqs and len(fastqs)) == 2:
         sys.exit(p.print_help())
 
