@@ -11,6 +11,14 @@ If you have software you'd like to add, Please contact bpederse@gmail.com
 The Benchmark is on paired-end reads, so all the software included
 can map paired end reads.
 
+Cite
+====
+::
+
+    MethylCoder: Software Pipeline for Bisulfite-Treated Sequences 
+    Brent Pedersen; Tzung-Fu Hsieh; Christian Ibarra; Robert L. Fischer
+    Bioinformatics 2011; doi: 10.1093/bioinformatics/btr394
+
 Implementations
 ===============
 

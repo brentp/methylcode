@@ -30,6 +30,14 @@ Please report any requests, bugs, patches, problems, docs to bpederse@gmail.com
 
 It is distributed under the `New BSD License <http://github.com/brentp/methylcode/blob/master/LICENSE>`_
 
+Cite
+----
+::
+
+    MethylCoder: Software Pipeline for Bisulfite-Treated Sequences 
+    Brent Pedersen; Tzung-Fu Hsieh; Christian Ibarra; Robert L. Fischer
+    Bioinformatics 2011; doi: 10.1093/bioinformatics/btr394
+
 
 Requirements
 ============
