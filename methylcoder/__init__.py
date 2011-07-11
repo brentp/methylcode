@@ -564,7 +564,7 @@ def write_sam_commands(out_dir, fasta, fname="methylcoded"):
     print >> out, """\
 SAMTOOLS=/usr/local/src/samtools/samtools
 # 0x4 takes only the aligned reads.
-$SAMTOOLS view -h -bS -F 0x4 | $SAMTOOLS sort - %(odir)/%(fname)s
+$SAMTOOLS view -h -bS -F 0x4 | $SAMTOOLS sort - %(odir)s/%(fname)s
 $SAMTOOLS index %(odir)s/%(fname)s.bam
 # TO view:
 # $SAMTOOLS tview %(odir)s/%(fname)s.bam %(fapath)s
