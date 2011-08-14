@@ -202,7 +202,8 @@ Notes
 =====
 
 **warning**
-when run with bowtie, methylcoder assumes that the Bisulfite converted reads are created using the Zilberman/Ecker method in which BS conversion occurs *after* conversion to solexa library--giving only 2 possibibilities. This is in contrast to the Jacobsen method which gives 4 possiblities. When run with gsnap, it is assumed that the Jacobsen method was used.
+Methylcoder assumes that the Bisulfite converted reads are created using the Zilberman/Ecker method in which BS conversion occurs *after* conversion to solexa library--giving only 2 possibibilities. This is in contrast to the Jacobsen method which gives 4 possiblities.
+If you have a library generated using the Jacobsen method, you can use `scripts/tagged_reads_prep.py` to convert the reads to a format that MethylCoder can map.
 
 .. _`cython`: http://cython.org
 .. _`numpy`: http://numpy.scipy.org
