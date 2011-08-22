@@ -178,22 +178,26 @@ cdef dict seqspace = {
     'TT': 0,
     'TG': 1,
     'TC': 2,
-    'TA': 3}
+    'TA': 3,
+    }
 
 def seq2cs(char *seq):
     """
     convert sequence into colorspace
     """
-    seqlen = strlen(seq)
+    cdef int seqlen = strlen(seq)
     cdef char *cs = <char *>malloc(sizeof(char) * (1 + seqlen))
     cdef char[3] dub
     dub[2] = '\0'
     cs[0] = seq[0]
     cdef int i
     for i in range(seqlen - 1):
-        dub[0] = seq[i]
-        dub[1] = seq[i + 1]
-        cs[i + 1] = seqspace[dub] + 48
+        if seq[i] == 78: cs[i + 1] = '4'
+        elif seq[i + 1] == 78: cs[i + 1] = '4'
+        else:
+            dub[0] = seq[i]
+            dub[1] = seq[i + 1]
+            cs[i + 1] = seqspace[dub] + 48
     cs[seqlen] = c'\0'
     try:
         return cs

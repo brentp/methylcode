@@ -35,12 +35,12 @@ def calc_methylation(sequence):
     >>> calc_methylation("GGAGG")
     array([6, 6, 0, 6, 6], dtype=uint8)
     """
-    sequence = "HH" + sequence.upper() + 'HH'
+    sequence = "HH" + sequence.upper() + "HH"
 
     seq = np.array(sequence, dtype='c')
     methyl = _calc_methylation(seq)
 
-    seq = np.array(revcomp(sequence), dtype='c')
+    seq[:] = np.array(revcomp(sequence), dtype='c')
     methyl = _calc_methylation(seq, methyl[::-1])
     # chop off the 'HH' and reverse since it was reversed
     # for the 2nd run. the index is confusing, but correct.
@@ -76,14 +76,16 @@ def _calc_methylation(seq, methyl=None):
     # where a 'G' follows a 'C'
     first_g = seq[c_idxs + 1] == 'G'
     cg_idxs, = np.where(first_g)
-    cg = c_idxs[cg_idxs] 
+    cg = c_idxs[cg_idxs]
     methyl[cg] = CG + adder
+    del cg
 
     # CHG
     second_g = seq[c_idxs + 2] == 'G'
     chg_idxs, = np.where((~first_g) & (second_g))
     chg = c_idxs[chg_idxs]
     methyl[chg] = CHG + adder
+    del chg
 
     # CHH
     chh_idxs, = np.where(~(first_g | second_g))
@@ -103,6 +105,8 @@ if __name__ == "__main__":
     import doctest
     import os
     doctest.testmod()
+    import sys
+    sys.exit()
 
     p = optparse.OptionParser(__doc__)
     opts, args = p.parse_args()

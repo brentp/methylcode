@@ -128,7 +128,7 @@ def run_bowtie(opts, ref_path, reads_list_c2t, bowtie_args, bowtie_sequence_flag
     bowtie_path = opts.bowtie
     sam_out_file = out_dir + "/" + op.basename(ref_path) + ".sam"
     cmd = ("%(bowtie_path)s/bowtie --fullref --sam " + \
-           "--chunkmbs 1024 --norc -p %(threads)d %(bowtie_args)s %(ref_path)s " + \
+           "--chunkmbs 512 --norc -p %(threads)d %(bowtie_args)s %(ref_path)s " + \
            "-%(bowtie_sequence_flag)s ") % locals()
     # single end reads
     if len(reads_list_c2t) == 1:
@@ -527,11 +527,11 @@ def write_files(original_fasta, out_dir, counts, write_bin):
 
 
     for i, seqid in enumerate(sorted(counts.keys())):
-        cs = counts[seqid]['c']
-        ts = counts[seqid]['t']
 
         seq = str(fa[seqid])
         mtype = calc_methylation(seq)
+        cs = counts[seqid]['c']
+        ts = counts[seqid]['t']
 
         print_summary(seqid, cs, ts, mtype, summary_counts, f_summary, print_header=(i==0))
 
@@ -541,6 +541,7 @@ def write_files(original_fasta, out_dir, counts, write_bin):
             mtype.tofile(fmethyltype % seqid)
 
         to_text_file(cs, ts, mtype, seqid, out)
+        del cs; del ts; del mtype
 
     print_genome_summary(summary_counts, f_summary)
 
