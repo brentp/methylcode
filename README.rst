@@ -180,6 +180,13 @@ Limitations
     one with chromosomes 1-9 and the other with chromosomes 10+ works well.
     This limitation does not exist when GSNAP is used as the aligner.
 
+Colorspace
+----------
+
+ At one point, MethylCoder supported colorspace through a naive
+ algorithm. Since there are now better options, namely `bsolana`_ , this has
+ been deprecated.
+
 Analysis/Visualization
 ======================
 
@@ -213,3 +220,5 @@ If you have a library generated using the Jacobsen method, you can use `scripts/
 .. _`sam-tools`: http://samtools.sourceforge.net/
 .. _`Fischer Lab`: http://epmb.berkeley.edu/facPage/dispFP.php?I=8
 .. _`gsnap`: http://research-pub.gene.com/gmap/
+.. _`bsolana`: http://code.google.com/p/bsolana/
+
