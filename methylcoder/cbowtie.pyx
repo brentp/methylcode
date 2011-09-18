@@ -133,6 +133,7 @@ def cs2seq(cs):
     'NTCTCCGAACTA'
 
     """
+    if cs == "..": return "NN"
     if not cs[0] in "ACGTN":
         cs = cs[::-1]
         return _cs2seq(cs)[::-1]
