@@ -53,11 +53,16 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
     reads_paths = [op.abspath(r) for r in reads_paths]
     log = op.join(out_dir, "gsnap_run.log")
 
+    if not "--mode" in gsnap_args:
+        cmet = "--mode=cmet-nonstranded"
+        print >>sys.stderr, "using non-stranded mode, specify " \
+         + " --mode=cmet-stranded in --extra-args for stranded mode"
+
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
     cmd = "%(gsnap_dir)s/gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
-    cmd += " -d %(ref_name)s --use-cmet %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
+    cmd += " -d %(ref_name)s %(cmet)s %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
     new_cmd = False
