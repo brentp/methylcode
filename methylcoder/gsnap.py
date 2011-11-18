@@ -10,43 +10,39 @@ from pyfasta import Fasta
 
 # /opt/src/gmap/gmap-2010-03-09/util/gmap_setup -D ../ -d hg19e_gmap  ../hg19e.f
 def gmap_setup(gsnap_dir, out_dir, ref_fasta):
-    ref_base = op.splitext(ref_fasta)[0]
+    ref_base = op.splitext(op.basename(ref_fasta))[0]
     ref_dir = op.dirname(ref_fasta)
     ref_name = op.basename(ref_base)
-    make_path = "%(out_dir)s/Makefile.%(ref_name)s" % locals()
-    gsnap_setup = op.join(gsnap_dir, "gmap_setup")
     # have to cd to the out_dir because gsnap writes to cwd.
-    cmd = "\n cd %(ref_dir)s && \n"
-    cmd += gsnap_setup
-    cmd += " -D %(ref_dir)s -o %(make_path)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_setup.log && "
-    cmd += "\n make -f %(make_path)s coords > gmap_coords.log && "
-    cmd += "\n make -f %(make_path)s gmapdb > gmap_gmapdb.log &&"
-    cmd += "\n %(gsnap_dir)s/cmetindex -d %(ref_name)s -F %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
+    cmd = "set -e\n cd %(ref_dir)s && \n"
+    cmd += "gmap_build"
+    cmd += " -D %(ref_dir)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_build.log && "
+    cmd += "\ncmetindex -d %(ref_name)s -F %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
+    rerun = False
     if not op.exists(cmd_last) or not is_up_to_date_b(ref_fasta, cmd_last) or not is_same_cmd(cmd, cmd_last):
         fh = open(cmd_last, "w")
         print >>fh, cmd
         fh.close()
+        rerun = True
     elif is_up_to_date_b(ref_fasta, cmd_last) and not is_same_cmd(cmd, cmd_last):
         fh = open(cmd_last, "w")
         print >>fh, cmd
         fh.close()
-    if not op.exists(op.join(out_dir, make_path)) or not (is_up_to_date_b(op.join(out_dir, make_path), cmd_last)):
-        # TODO ^ add check for cmetindex files as well.
+        rerun = True
+    # TODO: check time-stamp
+    if rerun:
         p = Popen(cmd.replace('\n', ' '), shell=True)
         print >>sys.stderr, "^ executing gmap/gsnap setup^"
         if p.wait() != 0:
-            pclean = Popen("cd %(out_dir)s; make -f %(make_path)s clean" % locals())
-            pclean.wait()
             pass
     else:
-        print >>sys.stderr, "^ NOT executing gmap/gsnap setup. everything is up to date.^"
+        print >>sys.stderr "gsnap setup stuff is up to date, re-using"
     return ref_base
 
 def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count):
-    #/opt/src/gmap/gmap-2010-03-09/src/gsnap --npaths 1 --quiet-if-excessive -A sam --nofails --nthreads 4 -D ./ -d hg19e_gmap --cmet bs_reads.fasta > bs.align.sam
     ref_base = op.splitext(ref_fasta)[0]
     ref_name = op.basename(ref_base)
     ref_dir = op.dirname(ref_fasta)
@@ -60,7 +56,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
 
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
-    cmd = "%(gsnap_dir)s/gsnap --quiet-if-excessive -A sam"
+    cmd = "gsnap --quiet-if-excessive -A sam"
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s %(cmet)s %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()

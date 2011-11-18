@@ -60,7 +60,7 @@ C
 -
 
 * `bowtie`_ to align the reads to the genome.
-* (optional) `gsnap`_ (>= 2011-03-28) alternative aligner. (part of gmap).
+* (optional) `gsnap`_ (>= 2011-11-17) preferred aligner. (part of gmap).
 * (optional) `sam-tools`_ to view the alignments and processing the reads
 
 Installation
@@ -88,11 +88,11 @@ The input to the pipeline is:
 
 * a reference fasta file with one entry per chromosome in the genome to which
   the reads are to be mapped.
-* a fastq  or fasta reads file. all reads must be the same length and must be
-  from Eckers/Zilberman bisulfite process (with only 2 possibilities not 4 from
-  Cokus protocol).
-  If 2 read files are specified, they are assumed to be pair ends and the aligner is
-  called appropriately.
+* a fastq  or fasta reads file. If reads are not from the from Eckers/Zilberman
+  bisulfite process (with only 2 possibilities) use "--mode=cmet-stranded" in
+  the --extra-args to GSNAP
+
+* If 2 read files are specified, they are assumed to be pair ends and the aligner is called appropriately.
 
 Output
 ======
@@ -170,6 +170,8 @@ Additional args can be sent directly to the aligner as a string to methylcoder.p
 and that string will be passed directly to the bowtie invocation when it is
 called from methylcoder. Whenever 2 fastq files are sent, they are assumed
 to be paired-end reads.
+
+For stranded reads, send "--mode=cmet-stranded" to gsnap via --extra-args.
 
 Limitations
 ===========
