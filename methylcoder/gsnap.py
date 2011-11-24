@@ -33,13 +33,14 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
         fh.close()
         rerun = True
     # TODO: check time-stamp
+    rerun = True
     if rerun:
         p = Popen(cmd.replace('\n', ' '), shell=True)
         print >>sys.stderr, "^ executing gmap/gsnap setup^"
         if p.wait() != 0:
             pass
     else:
-        print >>sys.stderr "gsnap setup stuff is up to date, re-using"
+        print >>sys.stderr, "gsnap setup stuff is up to date, re-using"
     return ref_base
 
 def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count):
