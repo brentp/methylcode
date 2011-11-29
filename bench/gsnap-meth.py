@@ -54,8 +54,31 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     print >>sys.stderr, cmd_index
 
     cmd_pileup = "samtools mpileup -f %(reference)s -ABI \
-            $(out_dir)s/gsnap-meth.bam\n" % locals()
+            %(out_dir)s/gsnap-meth.bam\n" % locals()
     print >>sys.stderr, cmd_pileup
+
+    conversion = {"C": "T", "G": "A"}
+    if stranded: conversion.update({ "T": "C", "A": "G"})
+
+    print "#chrom\tpos1\tn_same\tn_converted"
+    for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup).stdout):
+        chrom, pos1, ref, coverage, bases, quals = toks
+        if coverage == '0': continue
+        bases, ref = bases.upper(), ref.upper()
+
+        converted = conversion.get(ref)
+        if converted is None: continue
+        # TODO: reason out the stranded stuffs
+
+        # . == same on + strand, , == same on - strand
+        n_same = sum(1 for b in bases if b == ",")
+        # converted is "ACGT" for + strand "acgt" for - strand
+        n_converted = sum(1 for b in bases if b == converted)
+        print "\t".join((chrom, pos1, str(n_same), str(n_converted)))
+
+        if n_same + n_converted == 0:
+            print toks
+
 
 def run(args):
 
