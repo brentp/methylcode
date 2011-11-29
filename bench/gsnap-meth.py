@@ -3,23 +3,33 @@ runner for gsnap on methylation data.
 gmap_build, gsnap and samtools must be on the PATH of the calling environment
 """
 
-"""
-gmap_build -k 12 -D /usr/local/src/methylcoder/bench/reference -d thaliana_v10 /usr/local/src/methylcoder/bench/reference/thaliana_v10.fasta > /usr/local/src/methylcoder/bench/methylcoder_gsnap/gmap_build.log && 
-cmetindex -d thaliana_v10 -F /usr/local/src/methylcoder/bench/reference > gmap_cmetindex.log 2> gmap_cmetindex.error.log
-
-gsnap --quiet-if-excessive -A sam -k 12  --nofails --nthreads 2 -D /usr/local/src/methylcoder/bench/reference --quiet-if-excessive --npaths 1 -d thaliana_v10 --mode=cmet-nonstranded /usr/local/src/methylcoder/bench/reads/WT_endosperm_BS_seq_raw_batch-2.1.fastq.trim /usr/local/src/methylcoder/bench/reads/WT_endosperm_BS_seq_raw_batch-2.2.fastq.trim > /usr/local/src/methylcoder/bench/methylcoder_gsnap/methylcoded.gsnap.sam 2> /usr/local/src/methylcoder/bench/methylcoder_gsnap/gsnap_run.log
-
-gsnap --quiet-if-excessive -A sam -k 12  --nofails --nthreads 2 -D /usr/local/src/methylcoder/bench/reference --quiet-if-excessive --npaths 1 -d thaliana_v10 --mode=cmet-nonstranded /usr/local/src/methylcoder/bench/reads/WT_endosperm_BS_seq_raw_batch-2.1.fastq.trim
-"""
-
 import argparse
 import sys
 import os
 import os.path as op
 import subprocess as sp
+import collections
 
 def sh(cmd):
     return sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+
+
+def sequence(chrom, pos1, reference, cache=[None], cache_len=500):
+    """
+    to get context return 2 bases on either side of pos1
+    """
+    if cache[0] is not None:
+        c_chrom, c_start, seq = cache[0]
+        # pileup is sorted, so we can do this.
+        if chrom == c_chrom and pos1 < c_start + cache_len - 2:
+            adjusted_pos = max(pos1 - c_start - 2, 0)
+            return seq[adjusted_pos:adjusted_pos + 5].upper()
+
+    start, end = pos1 - 2, pos1 + cache_len
+    p = sh('samtools faidx %(reference)s %(chrom)s:%(start)d-%(end)d' % locals())
+    seq = "".join(p.stdout.readlines()[1:]).replace("\n", "") # first line is header
+    cache[0] = (chrom, start, seq)
+    return seq[0:5].upper()
 
 def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""):
     ref_dir = op.dirname(reference)
@@ -58,9 +68,13 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     print >>sys.stderr, cmd_pileup
 
     conversion = {"C": "T", "G": "A"}
-    if stranded: conversion.update({ "T": "C", "A": "G"})
+    print "#chrom\tpos1\tn_same\tn_converted\tcontext"
+    # TODO: context
 
-    print "#chrom\tpos1\tn_same\tn_converted"
+    summary = {"CG": collections.defaultdict(int),
+               "CHG": collections.defaultdict(int),
+               "CHH": collections.defaultdict(int)}
+
     for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup).stdout):
         chrom, pos1, ref, coverage, bases, quals = toks
         if coverage == '0': continue
@@ -68,17 +82,34 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
 
         converted = conversion.get(ref)
         if converted is None: continue
-        # TODO: reason out the stranded stuffs
 
+        s = sequence(chrom, int(pos1), reference)
+        #assert s[2].upper() ==  ref.upper()
+        ctx = get_context(s, ref == "C")
+
+        # TODO: account for strand here.
         # . == same on + strand, , == same on - strand
-        n_same = sum(1 for b in bases if b == ",")
+        n_same = sum(1 for b in bases if b in ".,")
         # converted is "ACGT" for + strand "acgt" for - strand
         n_converted = sum(1 for b in bases if b == converted)
-        print "\t".join((chrom, pos1, str(n_same), str(n_converted)))
+        summary[ctx[:-1]]['same'] += n_same
+        summary[ctx[:-1]]['converted'] += n_converted
+        print "\t".join((chrom, pos1, str(n_same), str(n_converted), ctx))
 
-        if n_same + n_converted == 0:
-            print toks
+    for context in summary:
+        s = summary[context]
+        print >>sys.stderr, context, s["same"] / float(s["same"] + s["converted"])
 
+def get_context(seq5, forward):
+    if forward:
+        if seq5[3] == "G": return "CG+"
+        if seq5[4] == "G": return "CHG+"
+        return "CHH+"
+    else: # reverse complement
+        #assert seq5[2] == "G", seq5
+        if seq5[1] == "C": return "CG-"
+        if seq5[0] == "C": return "CHG-"
+        return "CHH-"
 
 def run(args):
 
