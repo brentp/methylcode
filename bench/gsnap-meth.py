@@ -10,11 +10,19 @@ import os.path as op
 import subprocess as sp
 import collections
 
-def sh(cmd):
-    return sp.Popen(cmd, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+def sh(cmd, log, wait=True):
+    print >>sys.stderr, "[running command] %s" % cmd
+    p = sp.Popen(cmd, shell=True, stderr=sp.PIPE, stdout=sp.PIPE)
+    if wait:
+        for line in p.stderr:
+            print >>log, line,
+        p.wait()
+        if p.returncode != 0:
+            sys.exit(p.returncode)
+    return p
 
 
-def sequence(chrom, pos1, reference, cache=[None]):
+def sequence(chrom, pos1, reference, log, cache=[None]):
     """
     to get context return 2 bases on either side of pos1
 
@@ -24,7 +32,8 @@ def sequence(chrom, pos1, reference, cache=[None]):
     #'CCCTA'
     """
     if cache[0] is None or cache[0][0] != chrom:
-        p = sh('samtools faidx %(reference)s %(chrom)s' % locals())
+        p = sh('samtools faidx %(reference)s %(chrom)s' % locals(), log,
+                                        wait=False)
         # first line is header
         seq = "".join(p.stdout.readlines()[1:]).replace("\n", "")
         cache[0] = (chrom, seq)
@@ -41,15 +50,18 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     assert os.access(reference, os.R_OK), ("reference not found / readable")
     assert os.access(ref_dir, os.W_OK), ("%s must be writable" % (ref_dir))
 
-    cmd = "gmap_build -k %(kmer)i -D %(ref_dir)s -d %(ref_base)s %(reference)s"
+    log = open(out_dir + "/gsnap-meth-run.log", "w")
+    print >>sys.stderr, ("writing log to: %s" % log.name)
+
+    cmd = "gmap_build -w 1 -k %(kmer)i -D %(ref_dir)s -d %(ref_base)s %(reference)s"
     cmd %= locals()
-    print >>sys.stderr, cmd + "\n"
+    sh(cmd, log)
 
     cmd_cmet = "cmetindex -d %(ref_base)s -F %(ref_dir)s -k %(kmer)d\n"
     cmd_cmet %= locals()
-    print >>sys.stderr, cmd_cmet
+    sh(cmd_cmet, log)
 
-    threads = 2 # locals
+    threads = 4 # locals
     mode = ["cmet-nonstranded", "cmet-stranded"][int(stranded)]
     reads_str = " ".join(reads)
     cmd_gsnap = "gsnap --npaths 1 --quiet-if-excessive --nthreads %(threads)s \
@@ -57,18 +69,17 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
            %(reads_str)s"
     cmd_gsnap += "| samtools view -bSF 4 - > %(out_dir)s/gsnap-meth.u.bam"
     cmd_gsnap %= locals()
-    print >>sys.stderr, cmd_gsnap
+    sh(cmd_gsnap, log)
 
     cmd_sort = "samtools sort %(out_dir)s/gsnap-meth.u.bam \
             %(out_dir)s/gsnap-meth\n" % locals()
-    print >>sys.stderr, cmd_sort
+    sh(cmd_sort, log)
 
     cmd_index = "samtools index %(out_dir)s/gsnap-meth.bam\n" % locals()
-    print >>sys.stderr, cmd_index
+    sh(cmd_index, log)
 
     cmd_pileup = "samtools mpileup -f %(reference)s -ABIQ 0 \
             %(out_dir)s/gsnap-meth.bam\n" % locals()
-    print >>sys.stderr, cmd_pileup
 
     conversion = {"C": "T", "G": "a"}
     print "#chrom\tpos1\tn_same\tn_converted\tcontext"
@@ -78,7 +89,8 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
                "CHG": collections.defaultdict(int),
                "CHH": collections.defaultdict(int)})
 
-    for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup).stdout):
+    for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup, log,
+                                                    wait=False).stdout):
         chrom, pos1, ref, coverage, bases, quals = toks
         if coverage == '0': continue
         ref = ref.upper()
@@ -86,7 +98,7 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
         if converted is None: continue
 
 
-        s = sequence(chrom, int(pos1), reference)
+        s = sequence(chrom, int(pos1), reference, log)
         ctx = get_context(s, ref == "C")
 
 
@@ -96,9 +108,9 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
         else:
             n_same = sum(1 for b in bases if b in ",")
 
-        n_converted = sum(1 for b in bases if b in converted)
+        n_converted = sum(1 for b in bases if b == converted)
 
-        # converted is "ACGT" for + strand "acgt" for - strand
+        if n_same + n_converted == 0: continue
 
         summary[chrom][ctx[:-1]]['same'] += n_same
         summary[chrom][ctx[:-1]]['converted'] += n_converted
