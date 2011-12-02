@@ -70,46 +70,47 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
             %(out_dir)s/gsnap-meth.bam\n" % locals()
     print >>sys.stderr, cmd_pileup
 
-    conversion = {"C": "T", "G": "A"}
+    conversion = {"C": "T", "G": "a"}
     print "#chrom\tpos1\tn_same\tn_converted\tcontext"
 
-    summary = {"CG": collections.defaultdict(int),
+    summary = collections.defaultdict(lambda:
+              {"CG": collections.defaultdict(int),
                "CHG": collections.defaultdict(int),
-               "CHH": collections.defaultdict(int)}
+               "CHH": collections.defaultdict(int)})
 
     for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup).stdout):
         chrom, pos1, ref, coverage, bases, quals = toks
-        ref = ref.upper()
         if coverage == '0': continue
-
-        s = sequence(chrom, int(pos1), reference)
+        ref = ref.upper()
         converted = conversion.get(ref)
         if converted is None: continue
+
+
+        s = sequence(chrom, int(pos1), reference)
         ctx = get_context(s, ref == "C")
 
-        bases = bases.upper()
 
-        # TODO: account for strand here.
         # . == same on + strand, , == same on - strand
         if ref == "C":
-            n_same = sum(1 for b in bases if b == ".")
+            n_same = sum(1 for b in bases if b in ".")
         else:
-            continue
-            n_same = sum(1 for b in bases if b == ",")
-        n_converted = sum(1 for b in bases if b == converted)
+            n_same = sum(1 for b in bases if b in ",")
+
+        n_converted = sum(1 for b in bases if b in converted)
 
         # converted is "ACGT" for + strand "acgt" for - strand
 
-        summary[ctx[:-1]]['same'] += n_same
-        summary[ctx[:-1]]['converted'] += n_converted
+        summary[chrom][ctx[:-1]]['same'] += n_same
+        summary[chrom][ctx[:-1]]['converted'] += n_converted
         print "\t".join((chrom, pos1, str(n_same), str(n_converted), ctx))
 
-    print >>sys.stderr, "CTX\tc\tt\t%"
-    for context in summary:
-        s = summary[context]
-        print >>sys.stderr, "%s\t%i\t%i\t%.6f" % (context, s["same"],
-                        s["converted"], s["same"] / float(s["same"] +
-                            s["converted"]))
+    print >>sys.stderr, "#chrom\tctx\tc\tt\tpct_methylation"
+    for chrom in summary:
+        for context in summary[chrom]:
+            s = summary[chrom][context]
+            print >>sys.stderr, "%s\t%s\t%i\t%i\t%.6f" % (chrom, context, s["same"],
+                            s["converted"], s["same"] / float(s["same"] +
+                                s["converted"]))
 
 def get_context(seq5, forward):
     """
