@@ -62,6 +62,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s %(cmet)s %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
+    print >>sys.stderr, cmd
     cmd_path = op.join(out_dir, "ran_gsnap.sh")
     new_cmd = False
     if not is_same_cmd(cmd, cmd_path):
@@ -70,8 +71,6 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
         fh.close()
         new_cmd = True
 
-    print >>sys.stderr, "\n" + cmd
-    return
     if not new_cmd and all(is_up_to_date_b(r, out_sam) for r in reads_paths) \
         and all(is_up_to_date_b(r, cmd_path) for r in reads_paths):
         print >>sys.stderr, "^ NOT executing gsnap. everything is up to date.^"
@@ -87,32 +86,6 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
             sys.exit(1)
     return out_sam
 
-def fastx_to_gsnap_fasta(reads, out_fa=sys.stdout):
-
-    fh1 = open(reads[0])
-    fh2 = open(reads[1]) if len(reads) > 1 else None
-    read1 = fh1.readline
-    read2 = fh2.readline if fh2 is not None else None
-    while True:
-        header1 = read1().strip()
-        if header1 == "": break
-        assert header1[0] in "@>"
-        seq1 = read1()
-        # for fastx, discard the 2 "extra" rows
-        if header1[0] == "@":
-            read1(); read1()
-        print >>out_fa, ">" + header1[1:]
-        print >>out_fa, seq1,
-
-        if fh2 is not None:
-            header2 = read2()
-            assert header2.startswith(header1[:-4])
-            seq2 = read2()
-            print >>out_fa, seq2,
-            if header1[0] == "@":
-                read2(); read2()
-    return out_fa.name
-
 def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     fa = Fasta(ref_path)
 
@@ -122,7 +95,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     #chr_lengths = dict((k, len(fa[k])) for k in fa.iterkeys())
 
 
-    print >>sys.stderr, "tabulating methylation"
+    print >>sys.stderr, "tabulating methylation for %s" % gsnap_f
 
     for sline in open(gsnap_f):
         if sline.startswith("@SQ"):
@@ -147,13 +120,13 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
             #line[10] = line[10][:len(aln_seq)]
 
         # both ends start at exactly the same place.
-        if insert_length == 0: continue
+        if paired_end and insert_length == 0: continue
         # handle overlapping reads. one side has + insert, the other is -
         if -read_length < insert_length < 0:
             insert_length = abs(insert_length)
             aln_seq = aln_seq[:-(read_length - insert_length)]
             read_length = len(aln_seq)
-        if line[7] == '0': continue
+        if paired_end and line[7] == '0': continue
 
         bp1 = bp0 + read_length
         ref_seq = (fa[seqid][bp0:bp1]).upper()
@@ -183,25 +156,8 @@ def is_fastq(f):
     return ifastq
 
 def main(out_dir, ref_fasta, reads, gsnap_path, gsnap_args, write_bin):
-    fa_reads = out_dir + "/" + op.basename(reads[0]).rstrip("_1") + ".fasta"
-    if all(is_fastq(r) for r in reads):
-        print >>sys.stderr, "using existing reads files"
-        gsnap_reads = reads
-    elif all(is_up_to_date_b(r, fa_reads) for r in reads):
-        # fasta reads. up to date.
-        gsnap_reads = reads
-    else:
-        # its a pair of fasta files. put into gsnap format.
-        if len(reads) > 1:
-            out_fa = open(fa_reads, "w")
-            fastx_to_gsnap_fasta(reads, out_fa)
-            out_fa.close()
-            gsnap_reads = (fa_reads,)
-        else:
-            # if it's a single fasta, don't need to write any new files.
-            gsnap_reads = (reads[0],)
     gmap_setup(gsnap_path, out_dir, ref_fasta)
-    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, gsnap_reads, cpu_count=CPU_COUNT)
+    gsnap_sam = run_gsnap(gsnap_path, gsnap_args, out_dir, ref_fasta, reads, cpu_count=CPU_COUNT)
     paired_end = len(reads) > 1
 
     parse_gsnap_sam(gsnap_sam, ref_fasta, out_dir, paired_end, write_bin)
