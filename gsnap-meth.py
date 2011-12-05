@@ -148,11 +148,6 @@ def run(args):
     gsnap_meth(reference, reads, args.out_dir, args.kmer, args.stranded,
                args.extra_args)
 
-
-
-
-
-
 def main():
     p = argparse.ArgumentParser(description=__doc__,
                    formatter_class=argparse.RawDescriptionHelpFormatter)
