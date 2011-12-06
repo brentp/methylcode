@@ -21,6 +21,9 @@ def sh(cmd, log, wait=True):
             sys.exit(p.returncode)
     return p
 
+def nopen(f, mode="rb"):
+    if not isinstance(f, basestring): return f
+    return open(f, mode)
 
 def sequence(chrom, pos1, reference, log, cache=[None]):
     """
@@ -50,9 +53,10 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     assert os.access(reference, os.R_OK), ("reference not found / readable")
     assert os.access(ref_dir, os.W_OK), ("%s must be writable" % (ref_dir))
 
+    threads = 4 # locals
     log = open(out_dir + "/gsnap-meth-run.log", "w")
-    print >>sys.stderr, ("writing log to: %s" % log.name)
 
+    print >>sys.stderr, ("writing log to: %s" % log.name)
     cmd = "gmap_build -w 1 -k %(kmer)i -D %(ref_dir)s -d %(ref_base)s %(reference)s"
     cmd %= locals()
     sh(cmd, log)
@@ -61,7 +65,6 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     cmd_cmet %= locals()
     sh(cmd_cmet, log)
 
-    threads = 4 # locals
     mode = ["cmet-nonstranded", "cmet-stranded"][int(stranded)]
     reads_str = " ".join(reads)
     cmd_gsnap = "gsnap --npaths 1 --quiet-if-excessive --nthreads %(threads)s \
@@ -78,8 +81,16 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     cmd_index = "samtools index %(out_dir)s/gsnap-meth.bam\n" % locals()
     sh(cmd_index, log)
 
+    summarize_bam("%(out_dir)s/gsnap-meth.bam" % locals(), reference, log)
+
+def summarize_bam(bam, reference, log=sys.stderr):
+    assert op.exists(bam)
+    assert op.exists(reference)
     cmd_pileup = "samtools mpileup -f %(reference)s -ABIQ 0 \
-            %(out_dir)s/gsnap-meth.bam\n" % locals()
+            %(bam)s\n" % locals()
+    summarize_pileup(sh(cmd_pileup, log, wait=False).stdout, reference, log)
+
+def summarize_pileup(fpileup, reference, log):
 
     conversion = {"C": "T", "G": "a"}
     print "#chrom\tpos1\tn_same\tn_converted\tcontext"
@@ -88,9 +99,7 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
               {"CG": collections.defaultdict(int),
                "CHG": collections.defaultdict(int),
                "CHH": collections.defaultdict(int)})
-
-    for toks in (l.rstrip("\r\n").split("\t") for l in sh(cmd_pileup, log,
-                                                    wait=False).stdout):
+    for toks in (l.rstrip("\r\n").split("\t") for l in nopen(fpileup)):
         chrom, pos1, ref, coverage, bases, quals = toks
         if coverage == '0': continue
         ref = ref.upper()
