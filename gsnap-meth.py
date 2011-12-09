@@ -100,7 +100,7 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     reads_str = " ".join(reads)
     cmd_gsnap = "gsnap --npaths 1 --quiet-if-excessive --nthreads %(threads)s \
         -A sam -k %(kmer)d -D %(ref_dir)s -d %(ref_base)s --mode %(mode)s \
-           %(reads_str)s"
+         %(extra_args)s  %(reads_str)s"
     cmd_gsnap += "| samtools view -bSF 4 - > %(out_dir)s/gsnap-meth.u.bam"
     cmd_gsnap %= locals()
     sh(cmd_gsnap, log)
