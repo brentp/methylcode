@@ -46,6 +46,30 @@ def sequence(chrom, pos1, reference, log, cache=[None]):
     if len(s) == 5: return s
     return ("N" * (5 - len(s))) + s
 
+
+
+
+def gmap_built(ref_dir, ref_base):
+    for ext in ("chromosome", "contig.iit", "ref12153offsetscomp",
+                "chromosome.iit", "genomecomp", "ref12153positions",
+                "chrsubset", "maps", "version", "contig",
+                "ref12153gammaptrs"):
+
+        f = "%s/%s/%s.%s" % (ref_dir, ref_base, ref_base, ext)
+        if not op.exists(f):
+            return False
+    return True
+
+def cmextindexed(ref_dir, ref_base, kmer):
+
+    for ext in ("metct12153positions", "metct12153offsetscomp",
+                "metct12153gammaptrs", "metga12153offsetscomp",
+                "metga12153positions", "metga12153gammaptrs"):
+        f = "%s/%s/%s.%s" % (ref_dir, ref_base, ref_base, ext)
+        if not op.exists(f):
+            return False
+    return True
+
 def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""):
     ref_dir = op.dirname(reference)
     ref_base = op.splitext(op.basename(reference))[0] # locals
@@ -59,11 +83,17 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
     print >>sys.stderr, ("writing log to: %s" % log.name)
     cmd = "gmap_build -w 1 -k %(kmer)i -D %(ref_dir)s -d %(ref_base)s %(reference)s"
     cmd %= locals()
-    sh(cmd, log)
+    if not gmap_built(ref_dir, ref_base):
+        sh(cmd, log)
+    else:
+        print >>sys.stderr, "[skipping command] %s" % cmd
 
     cmd_cmet = "cmetindex -d %(ref_base)s -F %(ref_dir)s -k %(kmer)d\n"
     cmd_cmet %= locals()
-    sh(cmd_cmet, log)
+    if not cmextindexed(ref_dir, ref_base, kmer):
+        sh(cmd_cmet, log)
+    else:
+        print >>sys.stderr, "[skipping command] %s" % cmd
 
     mode = ["cmet-nonstranded", "cmet-stranded"][int(stranded)]
     reads_str = " ".join(reads)
