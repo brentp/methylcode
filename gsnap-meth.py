@@ -60,11 +60,12 @@ def gmap_built(ref_dir, ref_base):
             return False
     return True
 
-def cmextindexed(ref_dir, ref_base, kmer):
+def cmetindexed(ref_dir, ref_base, kmer):
 
-    for ext in ("metct12153positions", "metct12153offsetscomp",
-                "metct12153gammaptrs", "metga12153offsetscomp",
-                "metga12153positions", "metga12153gammaptrs"):
+    for ext in ("metct12%i3positions", "metct12%i3offsetscomp",
+                "metct12%i3gammaptrs", "metga12%i3offsetscomp",
+                "metga12%i3positions", "metga12%i3gammaptrs"):
+        ext = ext % kmer
         f = "%s/%s/%s.%s" % (ref_dir, ref_base, ref_base, ext)
         if not op.exists(f):
             return False
@@ -90,7 +91,7 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
 
     cmd_cmet = "cmetindex -d %(ref_base)s -F %(ref_dir)s -k %(kmer)d\n"
     cmd_cmet %= locals()
-    if not cmextindexed(ref_dir, ref_base, kmer):
+    if not cmetindexed(ref_dir, ref_base, kmer):
         sh(cmd_cmet, log)
     else:
         print >>sys.stderr, "[skipping command] %s" % cmd
