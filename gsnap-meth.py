@@ -17,7 +17,7 @@ def sh(cmd, log, wait=True):
         for line in p.stderr:
             print >>log, line,
         p.wait()
-        if p.returncode != 0:
+        if p.returncode != 0 or "aborted" in p.stderr.read():
             sys.exit(p.returncode)
     return p
 
