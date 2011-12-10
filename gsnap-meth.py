@@ -71,14 +71,13 @@ def cmetindexed(ref_dir, ref_base, kmer):
             return False
     return True
 
-def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""):
+def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args="", threads=1):
     ref_dir = op.dirname(reference)
     ref_base = op.splitext(op.basename(reference))[0] # locals
     ref_name = op.basename(reference) # locals.
     assert os.access(reference, os.R_OK), ("reference not found / readable")
     assert os.access(ref_dir, os.W_OK), ("%s must be writable" % (ref_dir))
 
-    threads = 4 # locals
     log = open(out_dir + "/gsnap-meth-run.log", "w")
 
     print >>sys.stderr, ("writing log to: %s" % log.name)
@@ -181,12 +180,16 @@ def get_context(seq5, forward):
         return "CHH-"
 
 def run(args):
-
+    if args.threads is None:
+        import multiprocessing
+        threads = multiprocessing.cpu_count() # locals
+    else:
+        threads = args.threads
     if not op.exists(args.out_dir): os.makedirs(args.out_dir)
     reference, kmer = op.abspath(args.reference), args.kmer
     reads = map(op.abspath, args.reads)
     gsnap_meth(reference, reads, args.out_dir, args.kmer, args.stranded,
-               args.extra_args)
+               args.extra_args, threads)
 
 def main():
     p = argparse.ArgumentParser(description=__doc__,
@@ -194,6 +197,8 @@ def main():
     p.add_argument("-r", "--reference", help="reference fasta")
     p.add_argument("-k", dest="kmer", help="kmer length for gsnap. default:" \
                    + "%(default)i", type=int, default=15)
+    p.add_argument("-t", "--threads", dest="threads", default=None,
+            help="number of threads for gsnap to use", type=int)
     p.add_argument("--stranded", action="store_true", default=False, help=\
                    "by default, non-stranded library prep is assumed")
     p.add_argument("--out-dir", dest="out_dir", help="path to output directory",
