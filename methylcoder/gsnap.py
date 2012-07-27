@@ -20,7 +20,6 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
     cmd += "\ncmetindex -d %(ref_base)s -F %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
-    return
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
     rerun = False
     if not op.exists(cmd_last) or not is_up_to_date_b(ref_fasta, cmd_last) or not is_same_cmd(cmd, cmd_last):
