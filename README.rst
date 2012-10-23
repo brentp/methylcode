@@ -53,7 +53,7 @@ all of these are available from pypi and as such are installable via
 
 * `numpy`_ to handle arrays and binary data in python
 * `pyfasta`_ to access/index fasta files
-* `py-tcdb`_ to access Tokyo Cabinet database
+* (required if bsddb is unavailable) `py-tcdb`_ replace bsddb
 
 matplotlib is required to plot the per-chromosome methylation levels.
 
@@ -61,7 +61,7 @@ C
 -
 
 * `bowtie`_ to align the reads to the genome.
-* `tokyocabinet`_ modern implementation of DBM database.
+* (required if bsddb is unavailable) `tokyocabinet`_ modern implementation of DBM database.
 * (optional) `gsnap`_ (>= 2011-11-17) preferred aligner. (part of gmap).
 * (optional) `sam-tools`_ to view the alignments and processing the reads
 
