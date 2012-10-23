@@ -53,6 +53,7 @@ all of these are available from pypi and as such are installable via
 
 * `numpy`_ to handle arrays and binary data in python
 * `pyfasta`_ to access/index fasta files
+* (required if bsddb is unavailable) `py-tcdb`_ replace bsddb
 
 matplotlib is required to plot the per-chromosome methylation levels.
 
@@ -60,6 +61,7 @@ C
 -
 
 * `bowtie`_ to align the reads to the genome.
+* (required if bsddb is unavailable) `tokyocabinet`_ modern implementation of DBM database.
 * (optional) `gsnap`_ (>= 2011-11-17) preferred aligner. (part of gmap).
 * (optional) `sam-tools`_ to view the alignments and processing the reads
 
@@ -217,8 +219,10 @@ If you have a library generated using the Jacobsen method, you can use `scripts/
 .. _`cython`: http://cython.org
 .. _`numpy`: http://numpy.scipy.org
 .. _`pyfasta`: http://pypi.python.org/pypi/pyfasta/
+.. _`py-tcdb`: http://pypi.python.org/pypi/py-tcdb
 .. _`h5py`: http://pypi.python.org/pypi/h5py/
 .. _`bowtie`: http://bowtie-bio.sourceforge.net/index.shtml
+.. _`tokyocabinet`: http://fallabs.com/tokyocabinet/
 .. _`sam-tools`: http://samtools.sourceforge.net/
 .. _`Fischer Lab`: http://epmb.berkeley.edu/facPage/dispFP.php?I=8
 .. _`gsnap`: http://research-pub.gene.com/gmap/
