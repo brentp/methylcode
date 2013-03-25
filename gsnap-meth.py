@@ -47,27 +47,27 @@ def sequence(chrom, pos1, reference, log, cache=[None]):
     return ("N" * (5 - len(s))) + s
 
 
-
-
 def gmap_built(ref_dir, ref_base):
     for ext in ("chromosome", "contig.iit", "ref12153offsetscomp",
-                "chromosome.iit", "genomecomp", "ref12153positions",
+                "chromosome.iit", "genomecomp",
                 "chrsubset", "maps", "version", "contig",
                 "ref12153gammaptrs"):
 
         f = "%s/%s/%s.%s" % (ref_dir, ref_base, ref_base, ext)
         if not op.exists(f):
+            print >>sys.stderr, "%s does not exist" % f
             return False
     return True
 
 def cmetindexed(ref_dir, ref_base, kmer):
 
-    for ext in ("metct12%i3positions", "metct12%i3offsetscomp",
+    for ext in ("metct12%i3offsetscomp",
                 "metct12%i3gammaptrs", "metga12%i3offsetscomp",
-                "metga12%i3positions", "metga12%i3gammaptrs"):
+                "metga12%i3gammaptrs"):
         ext = ext % kmer
         f = "%s/%s/%s.%s" % (ref_dir, ref_base, ref_base, ext)
         if not op.exists(f):
+            print >>sys.stderr, "%s does not exist" % f
             return False
     return True
 
@@ -97,6 +97,8 @@ def gsnap_meth(reference, reads, out_dir, kmer=15, stranded=False, extra_args=""
 
     mode = ["cmet-nonstranded", "cmet-stranded"][int(stranded)]
     reads_str = " ".join(reads)
+    if any(r.endswith(".gz") for r in reads):
+        extra_args = extra_args + " --gunzip"
     cmd_gsnap = "gsnap --npaths 1 --quiet-if-excessive --nthreads %(threads)s \
         -A sam -k %(kmer)d -D %(ref_dir)s -d %(ref_base)s --mode %(mode)s \
          %(extra_args)s  %(reads_str)s"
@@ -139,7 +141,6 @@ def summarize_pileup(fpileup, reference, log):
 
         s = sequence(chrom, int(pos1), reference, log)
         ctx = get_context(s, ref == "C")
-
 
         # . == same on + strand, , == same on - strand
         if ref == "C":
@@ -204,7 +205,7 @@ def main():
     p.add_argument("--out-dir", dest="out_dir", help="path to output directory",
                   default="gsnap-meth")
     p.add_argument("--extra-args", dest="extra_args", help="extra arguments"
-                " to send to gsnap")
+                " to send to gsnap", default="")
 
     p.add_argument('reads', nargs='+', help='reads files (if 2 files are'
                    'they are assumed to be paired end')
