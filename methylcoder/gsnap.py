@@ -15,9 +15,9 @@ def gmap_setup(gsnap_dir, out_dir, ref_fasta):
     ref_name = op.basename(ref_base)
     # have to cd to the out_dir because gsnap writes to cwd.
     cmd = "set -e\n cd %(ref_dir)s && \n"
-    cmd += "gmap_build"
-    cmd += " -k 12 -D %(ref_dir)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_build.log && "
-    cmd += "\ncmetindex -d %(ref_base)s -F %(ref_dir)s > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
+    cmd += "gmap_build -w 2"
+    cmd += " -k 15 -D %(ref_dir)s -d %(ref_base)s %(ref_fasta)s > %(out_dir)s/gmap_build.log && "
+    cmd += "\ncmetindex -d %(ref_base)s -F %(ref_dir)s -k 15 > gmap_cmetindex.log 2> gmap_cmetindex.error.log"
     cmd %= locals()
     print >>sys.stderr, "[ command ] $", cmd
     cmd_last = op.join(out_dir, "ran_gsnap_setup.sh")
@@ -57,7 +57,7 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
 
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
-    cmd = "gsnap --quiet-if-excessive -A sam -k 12 "
+    cmd = "gsnap --quiet-if-excessive -A sam -k 15 "
     cmd += " --nofails --nthreads %(cpu_count)i -D %(ref_dir)s %(gsnap_args)s"
     cmd += " -d %(ref_name)s %(cmet)s %(reads_paths_str)s > %(out_sam)s 2> %(log)s"
     cmd %= locals()
