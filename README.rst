@@ -186,10 +186,8 @@ Limitations
 
 Colorspace
 ----------
-
- At one point, MethylCoder supported colorspace through a naive
- algorithm. Since there are now better options, namely `bsolana`_ , this has
- been deprecated.
+ 
+ Don't do BS-Seq in colorspace.
 
 Analysis/Visualization
 ======================
