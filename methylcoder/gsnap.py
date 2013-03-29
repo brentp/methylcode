@@ -55,6 +55,9 @@ def run_gsnap(gsnap_dir, gsnap_args, out_dir, ref_fasta, reads_paths, cpu_count)
         print >>sys.stderr, "using non-stranded mode, specify " \
          + " --mode=cmet-stranded in --extra-args for stranded mode"
 
+    if any(r.endswith(".gz") for r in reads_paths):
+        gsnap_args += " --gunzip "
+
     reads_paths_str = " ".join(reads_paths)
     out_sam = op.abspath(op.join(out_dir, "methylcoded.gsnap.sam"))
     cmd = "gsnap --quiet-if-excessive -A sam -k 15 "
