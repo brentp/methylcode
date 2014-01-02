@@ -100,7 +100,7 @@ def parse_gsnap_sam(gsnap_f, ref_path, out_dir, paired_end, write_bin):
     print >>sys.stderr, "tabulating methylation for %s" % gsnap_f
 
     for sline in open(gsnap_f):
-        if sline.startswith("@SQ"):
+        if sline.startswith("@"):
             continue
 
         # the ends didn't map to same spot.
