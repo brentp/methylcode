@@ -1,6 +1,13 @@
 MethylCoder
 ===========
 
+.. note::
+
+    MethylCoder has been superseded by bwa-meth: https://github.com/brentp/bwa-meth/
+    That repo also contains an improved runner script for gsnap in compare/src/gsnap-meth.py
+ 
+   
+
 MethylCoder is a single program that takes of bisulfite-treated reads and
 outputs per-base methylation data. It also includes scripts for analysis
 and visualization.
